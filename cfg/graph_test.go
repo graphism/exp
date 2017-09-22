@@ -62,14 +62,22 @@ func TestCopy(t *testing.T) {
 
 func TestMerge(t *testing.T) {
 	golden := []struct {
-		path  string
-		nodes map[string]bool
-		id    string
+		path     string
+		wantPath string
+		nodes    map[string]bool
+		id       string
 	}{
 		{
-			path:  "testdata/b.dot",
-			nodes: map[string]bool{"B13": true, "B14": true, "B15": true},
-			id:    "I3",
+			path:     "testdata/sample.dot",
+			wantPath: "testdata/sample.dot.I1.golden",
+			nodes:    map[string]bool{"B1": true, "B2": true, "B3": true, "B4": true, "B5": true},
+			id:       "I1",
+		},
+		{
+			path:     "testdata/sample.dot",
+			wantPath: "testdata/sample.dot.I3.golden",
+			nodes:    map[string]bool{"B13": true, "B14": true, "B15": true},
+			id:       "I3",
 		},
 	}
 	for _, gold := range golden {
@@ -80,7 +88,7 @@ func TestMerge(t *testing.T) {
 			continue
 		}
 		// Parse golden output.
-		buf, err := ioutil.ReadFile(gold.path + ".golden")
+		buf, err := ioutil.ReadFile(gold.wantPath)
 		if err != nil {
 			t.Errorf("%q; unable to parse file; %v", gold.path, err)
 			continue

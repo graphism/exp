@@ -41,6 +41,11 @@ func (g *Graph) String() string {
 	return string(data)
 }
 
+// Entry returns the entry node of the control flow graph.
+func (g *Graph) Entry() graph.Node {
+	return g.entry
+}
+
 // NewNodeWithName returns a new node with the given name.
 func (g *Graph) NewNodeWithName(name string) *Node {
 	if len(name) == 0 {

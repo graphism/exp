@@ -1,4 +1,4 @@
-digraph H {
+digraph G {
 	B1 [label=entry]
 	B1 -> B2
 	B1 -> B5

@@ -14,6 +14,9 @@ func Merge(src *Graph, delNodes map[string]bool, newName string) *Graph {
 	dst.AddNode(newNode)
 	for delName := range delNodes {
 		delNode := dst.nodeWithName(delName)
+		if delNode.entry {
+			newNode.entry = true
+		}
 		// Record predecessors not part of nodes.
 		for _, pred := range dst.To(delNode) {
 			p := node(pred)
