@@ -36,15 +36,12 @@ func ParseBytes(b []byte) (*Graph, error) {
 	if err := dot.Unmarshal(b, g); err != nil {
 		return nil, errors.WithStack(err)
 	}
-	// Initialize mapping between node IDs and graph nodes.
+	// Initialize mapping between node names and graph nodes.
 	g.initNodes()
 	for _, n := range g.Nodes() {
-		nn, ok := n.(*Node)
-		if !ok {
-			panic(fmt.Errorf("invalid node type; expected *cfg.Node, got %T", n))
-		}
+		nn := node(n)
 		if nn.entry {
-			if g.entry != nil {
+			if g.entry != nil && nn != g.entry {
 				panic(fmt.Errorf("entry node already set in graph; prev entry node %#v, new entry node %#v", g.entry, nn))
 			}
 			g.entry = nn

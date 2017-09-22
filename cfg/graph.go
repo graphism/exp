@@ -20,7 +20,7 @@ type Graph struct {
 	id string
 	// Entry node of the control flow graph.
 	entry graph.Node
-	// nodes maps from node ID to graph node.
+	// nodes maps from node name to graph node.
 	nodes map[string]*Node
 }
 
@@ -41,20 +41,35 @@ func (g *Graph) String() string {
 	return string(data)
 }
 
-// initNodes initializes the mapping between node IDs and graph nodes.
+// NewNodeWithName returns a new node with the given name.
+func (g *Graph) NewNodeWithName(name string) *Node {
+	if len(name) == 0 {
+		panic("empty node name")
+	}
+	n := g.NewNode()
+	nn := node(n)
+	nn.name = name
+	return nn
+}
+
+// NodeWithName returns the node with the given name, and a boolean variable
+// indicating success.
+func (g *Graph) NodeWithName(name string) (*Node, bool) {
+	n, ok := g.nodes[name]
+	return n, ok
+}
+
+// initNodes initializes the mapping between node names and graph nodes.
 func (g *Graph) initNodes() {
 	for _, n := range g.Nodes() {
-		nn, ok := n.(*Node)
-		if !ok {
-			panic(fmt.Errorf("invalid node type; expected *cfg.Node, got %T", n))
+		nn := node(n)
+		if len(nn.name) == 0 {
+			panic(fmt.Errorf("invalid node; missing node name in %#v", nn))
 		}
-		if len(nn.id) == 0 {
-			panic(fmt.Errorf("invalid node; missing node ID in %#v", nn))
+		if prev, ok := g.nodes[nn.name]; ok && nn != prev {
+			panic(fmt.Errorf("node name %q already present in graph; prev node %#v, new node %#v", nn.name, prev, nn))
 		}
-		if prev, ok := g.nodes[nn.id]; ok {
-			panic(fmt.Errorf("node ID %q already present in graph; prev node %#v, new node %#v", nn.id, prev, nn))
-		}
-		g.nodes[nn.id] = nn
+		g.nodes[nn.name] = nn
 	}
 }
 
@@ -72,9 +87,7 @@ func (g *Graph) SetDOTID(id string) {
 	g.id = id
 }
 
-// --- [ graph.Builder ] -------------------------------------------------------
-
-// ~~~ [ graph.NodeAdder ] ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// --- [ graph.NodeAdder ] -----------------------------------------------------
 
 // NewNode returns a new node with a unique arbitrary ID.
 func (g *Graph) NewNode() graph.Node {
@@ -88,20 +101,33 @@ func (g *Graph) NewNode() graph.Node {
 //
 // If the added node ID matches an existing node ID, AddNode will panic.
 func (g *Graph) AddNode(n graph.Node) {
-	nn, ok := n.(*Node)
-	if !ok {
-		panic(fmt.Errorf("invalid node type; expected *cfg.Node, got %T", n))
-	}
+	nn := node(n)
 	g.DirectedGraph.AddNode(nn)
 	if nn.entry {
-		if g.entry != nil {
+		if g.entry != nil && nn != g.entry {
 			panic(fmt.Errorf("entry node already set in graph; prev entry node %#v, new entry node %#v", g.entry, nn))
 		}
 		g.entry = nn
 	}
+	if len(nn.name) > 0 {
+		if prev, ok := g.nodes[nn.name]; ok && nn != prev {
+			panic(fmt.Errorf("node name %q already present in graph; prev node %#v, new node %#v", nn.name, prev, nn))
+		}
+		g.nodes[nn.name] = nn
+	}
 }
 
-// ~~~ [ graph.EdgeAdder ] ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// --- [ graph.NodeRemover ] ---------------------------------------------------
+
+// RemoveNode removes a node from the graph, as well as any edges attached to
+// it. If the node is not in the graph it is a no-op.
+func (g *Graph) RemoveNode(n graph.Node) {
+	g.DirectedGraph.RemoveNode(n)
+	nn := node(n)
+	delete(g.nodes, nn.name)
+}
+
+// --- [ graph.EdgeAdder ] -----------------------------------------------------
 
 // NewEdge returns a new edge from the source to the destination node.
 func (g *Graph) NewEdge(from, to graph.Node) graph.Edge {
@@ -137,8 +163,8 @@ func (g *Graph) SetEdge(e graph.Edge) {
 // Node is a node in a control flow graph.
 type Node struct {
 	graph.Node
-	// Node ID (e.g. basic block label).
-	id string
+	// Node name (e.g. basic block label).
+	name string
 	// entry specifies whether the node is the entry node of the control flow
 	// graph.
 	entry bool
@@ -150,14 +176,14 @@ type Node struct {
 
 // DOTID returns the DOT ID of the node.
 func (n *Node) DOTID() string {
-	return n.id
+	return n.name
 }
 
 // --- [ dot.DOTIDSetter ] -----------------------------------------------------
 
 // SetDOTID sets the DOT ID of the node.
 func (n *Node) SetDOTID(id string) {
-	n.id = id
+	n.name = id
 }
 
 // --- [ encoding.Attributer ] -------------------------------------------------
@@ -243,4 +269,23 @@ func (a Attrs) Attributes() []encoding.Attribute {
 		attrs = append(attrs, attr)
 	}
 	return attrs
+}
+
+// node asserts that the given node is a control flow graph node.
+func node(n graph.Node) *Node {
+	if n, ok := n.(*Node); ok {
+		return n
+	}
+	panic(fmt.Errorf("invalid node type; expected *cfg.Node, got %T", n))
+}
+
+// nodeWithName returns the node with the given name.
+//
+// If no matching node was located, nodeWithName panics.
+func (g *Graph) nodeWithName(name string) *Node {
+	n, ok := g.nodes[name]
+	if !ok {
+		panic(fmt.Errorf("unable to locate node with name %q", name))
+	}
+	return n
 }
