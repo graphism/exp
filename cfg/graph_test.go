@@ -31,3 +31,31 @@ func TestRoundTrip(t *testing.T) {
 		}
 	}
 }
+
+func TestCopy(t *testing.T) {
+	golden := []struct {
+		path string
+	}{
+		{path: "testdata/a.dot"},
+	}
+	for _, gold := range golden {
+		buf, err := ioutil.ReadFile(gold.path)
+		if err != nil {
+			t.Errorf("%q; unable to read file; %v", gold.path, err)
+			continue
+		}
+		want := strings.TrimSpace(string(buf))
+		src, err := ParseString(want)
+		if err != nil {
+			t.Errorf("%q; unable to parse file; %v", gold.path, err)
+			continue
+		}
+		dst := NewGraph()
+		Copy(dst, src)
+		got := dst.String()
+		if got != want {
+			t.Errorf("%q; output mismatch; expected `%s`, got `%s`", gold.path, want, got)
+			continue
+		}
+	}
+}
