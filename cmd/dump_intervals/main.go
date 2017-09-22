@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/decomp/decomp/graph/cfg"
+	"github.com/graphism/exp/cfa"
+	"github.com/graphism/exp/cfg"
 	"github.com/graphism/exp/flow"
 	"github.com/pkg/errors"
+	"gonum.org/v1/gonum/graph/encoding/dot"
 )
 
 func main() {
@@ -31,6 +33,15 @@ func dumpIntervals(path string) error {
 		for _, n := range i.Nodes() {
 			fmt.Println("   n:", n)
 		}
+	}
+	gs := cfa.Structure(g)
+	for num, g := range gs {
+		name := fmt.Sprintf("G%d", num)
+		buf, err := dot.Marshal(g, name, "", "\t", false)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		fmt.Println(string(buf))
 	}
 	return nil
 }
