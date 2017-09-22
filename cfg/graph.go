@@ -8,6 +8,7 @@ import (
 	"github.com/graphism/simple"
 	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/encoding"
+	"gonum.org/v1/gonum/graph/encoding/dot"
 )
 
 // === [ Graph ] ===============================================================
@@ -29,6 +30,15 @@ func NewGraph() *Graph {
 		DirectedGraph: simple.NewDirectedGraph(),
 		nodes:         make(map[string]*Node),
 	}
+}
+
+// String returns the string representation of the graph in Graphviz DOT format.
+func (g *Graph) String() string {
+	data, err := dot.Marshal(g, g.DOTID(), "", "\t", false)
+	if err != nil {
+		panic(fmt.Errorf("unable to marshal control flow graph in DOT format; %v", err))
+	}
+	return string(data)
 }
 
 // initNodes initializes the mapping between node IDs and graph nodes.
