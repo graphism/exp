@@ -85,7 +85,7 @@ func TestMerge(t *testing.T) {
 			t.Errorf("%q; unable to parse file; %v", gold.path, err)
 			continue
 		}
-		want := string(buf)
+		want := strings.TrimSpace(string(buf))
 		// Merge.
 		out := Merge(in, gold.nodes, gold.id)
 		got := out.String()
