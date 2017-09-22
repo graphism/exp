@@ -3,7 +3,7 @@ package cfg
 import "gonum.org/v1/gonum/graph"
 
 // Merge returns a new control flow graph where the specified nodes have been
-// collapsed into a single node with the given node ID, and the predecessors and
+// collapsed into a single node with the new node name, and the predecessors and
 // successors of the specified nodes.
 func Merge(src *Graph, delNodes map[string]bool, newName string) *Graph {
 	dst := NewGraph()
