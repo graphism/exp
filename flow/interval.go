@@ -60,7 +60,7 @@ loop:
 		if n == entry {
 			continue
 		}
-		if I.contains(n) {
+		if I.Has(n) {
 			// skip if already in I(h).
 			continue
 		}
@@ -70,7 +70,7 @@ loop:
 			panic(fmt.Errorf("invalid node %v; missing predecessors", n))
 		}
 		for _, pred := range preds {
-			if !I.contains(pred) {
+			if !I.Has(pred) {
 				// skip node, as not all immediate predecessors are in I(h).
 				continue loop
 			}
@@ -93,7 +93,7 @@ func find3(g graph.Directed, entry graph.Node, I *Interval, H *queue) (graph.Nod
 			// skip if already in H.
 			continue
 		}
-		if I.contains(n) {
+		if I.Has(n) {
 			// skip if already in I(h).
 			continue
 		}
@@ -103,7 +103,7 @@ func find3(g graph.Directed, entry graph.Node, I *Interval, H *queue) (graph.Nod
 			panic(fmt.Errorf("invalid node %v; missing predecessors", n))
 		}
 		for _, pred := range preds {
-			if I.contains(pred) {
+			if I.Has(pred) {
 				return n, true
 			}
 		}
@@ -121,21 +121,17 @@ type Interval struct {
 
 func newInterval(g graph.Directed, head graph.Node) *Interval {
 	return &Interval{
-		g:     g,
-		Head:  head,
-		nodes: map[graph.Node]bool{head: true},
+		g:    g,
+		Head: head,
+		nodes: map[graph.Node]bool{
+			head: true,
+		},
 	}
 }
 
 func (I *Interval) addNode(n graph.Node) {
 	I.nodes[n] = true
 }
-
-func (I *Interval) contains(n graph.Node) bool {
-	return I.nodes[n]
-}
-
-// [skip start?]
 
 func (I *Interval) Has(n graph.Node) bool {
 	return I.nodes[n]
@@ -148,6 +144,9 @@ func (I *Interval) Nodes() []graph.Node {
 	}
 	return nodes
 }
+
+// [skip start?] embed graph.Directed in Interval, and only implement Has and
+// [Nodes methods.
 
 func (I *Interval) From(n graph.Node) []graph.Node {
 	return I.g.From(n)
