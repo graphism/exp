@@ -1,0 +1,4 @@
+digraph G4 {
+	// Node definitions.
+	I6 [label=entry];
+}
