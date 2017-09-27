@@ -46,7 +46,6 @@ func Intervals(g graph.Directed, entry graph.Node) []*Interval {
 			}
 			H.push(n)
 		}
-		fmt.Println("I:", I)
 		intervals = append(intervals, I)
 	}
 	return intervals
@@ -85,9 +84,6 @@ func find3(g graph.Directed, entry graph.Node, I *Interval, H *queue) (graph.Nod
 	// I(h) but which have immediate predecessors in I(h). Therefore a node is
 	// added to H the first time any (but not all) of its immediate predecessors
 	// become members of an interval.
-	for n := range I.nodes {
-		fmt.Println("I.n:", n)
-	}
 	for _, n := range g.Nodes() {
 		if H.has(n) {
 			// skip if already in H.
