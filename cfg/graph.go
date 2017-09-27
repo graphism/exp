@@ -173,6 +173,10 @@ type Node struct {
 	// entry specifies whether the node is the entry node of the control flow
 	// graph.
 	entry bool
+	// Depth first search pre-visit number.
+	Pre int
+	// Depth first search post-visit number.
+	Post int
 	// DOT attributes.
 	Attrs
 }
