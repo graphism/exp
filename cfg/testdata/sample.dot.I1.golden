@@ -1,5 +1,6 @@
 digraph G {
 	// Node definitions.
+	I1 [label=entry];
 	B6;
 	B7;
 	B8;
@@ -10,9 +11,9 @@ digraph G {
 	B13;
 	B14;
 	B15;
-	I1 [label=entry];
 
 	// Edge definitions.
+	I1 -> B6;
 	B6 -> B7;
 	B6 -> B12;
 	B7 -> B8;
@@ -26,5 +27,4 @@ digraph G {
 	B14 -> B13;
 	B14 -> B15;
 	B15 -> B6;
-	I1 -> B6;
 }
