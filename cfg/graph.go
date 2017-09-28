@@ -179,7 +179,32 @@ type Node struct {
 	Post int
 	// DOT attributes.
 	Attrs
+
+	// TODO: Figure out if we can move this information somewhere else; e.g.
+	// local variables in loopStruct.
+
+	// IsLatch specifies whether the node is a latch node.
+	IsLatch bool
+	// InLoop specifies whether the node is part of a loop.
+	InLoop bool
+	// Type of the loop.
+	LoopType LoopType
+	// Header node of the loop.
+	LoopHead graph.Node
+	// Follow node of the loop.
+	LoopFollow graph.Node
 }
+
+// LoopType specifies the type of a loop.
+type LoopType uint
+
+// Loop types.
+const (
+	LoopTypeNone     LoopType = iota
+	LoopTypePreTest           // pre-test loop
+	LoopTypePostTest          // post-test loop
+	LoopTypeEndless           // infinite loop
+)
 
 // --- [ dot.Node ] ------------------------------------------------------------
 

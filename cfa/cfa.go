@@ -17,6 +17,7 @@ import (
 	"github.com/pkg/errors"
 	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/encoding/dot"
+	"gonum.org/v1/gonum/graph/path"
 )
 
 func Structure(g *cfg.Graph) []*cfg.Graph {
@@ -73,37 +74,74 @@ func DerivedGraphSeq(src *cfg.Graph) []*cfg.Graph {
 	return Gs
 }
 
+// loopStruct marks all nodes of G belonging to loops
 func loopStruct(G *cfg.Graph, Gs []*cfg.Graph) {
-	inLoop := make(map[graph.Node]bool)
 	for _, Gi := range Gs {
 		Is := flow.Intervals(Gi, Gi.Entry())
 		for _, Ii := range Is {
-			latch, ok := findLatch(Ii, inLoop)
+			latch, ok := findLatch(Ii)
 			if !ok {
 				continue
 			}
-			// Mark nodes belonging to loop.
-			loop(Ii, latch, inLoop)
-			//inLoop[Ii.Head] = true
-			//inLoop[latch] = true
+			latch.IsLatch = true
+			// TODO: Check latching node is at the same nesting level of case
+			// statements (if any).
+
+			// Mark nodes belonging to loop and determine type of loop.
+			loop(Ii, latch)
 
 			// TODO: add nodes part of loop to inLoop. (latch, Ii.head)
 		}
 	}
 }
 
-func loop(I *flow.Interval, latch graph.Node, inLoop map[graph.Node]bool) {
-	inLoop[I.Head] = true
-	inLoop[latch] = true
-}
-
-func findLatch(I *flow.Interval, inLoop map[graph.Node]bool) (graph.Node, bool) {
-	for _, pred := range I.To(I.Head) {
-		if I.Has(pred) && !inLoop[pred] {
-			return pred, true
+// loop marks the nodes belonging to the loop determined by (head, latch), and
+// determines the loop type.
+func loop(I *flow.Interval, latch graph.Node) {
+	h := node(I.Head)
+	h.InLoop = true
+	h.LoopHead = h
+	l := node(latch)
+	l.InLoop = true
+	l.LoopHead = h
+	nodes := make(map[graph.Node]bool)
+	nodes[h] = true
+	// TODO: Consider moving idom computation Structure, and perform on G rather
+	// than I.
+	domtree := path.Dominators(h, I)
+	// Mark nodes in loop headed by head.
+	for _, n := range cfg.SortByRevPost(I.Nodes()) {
+		nn := node(n)
+		if nn.Post <= h.Post || nn.Post >= l.Post {
+			continue
+		}
+		if idom := domtree.DominatorOf(n); !nodes[idom] {
+			continue
+		}
+		nodes[nn] = true
+		// Set loop header if not yet part of another loop.
+		if nn.LoopHead == nil {
+			nn.LoopHead = h
 		}
 	}
-	return nil, false
+	nodes[l] = true
+}
+
+// findLatch returns the latching node of I(h), the node with the greatest
+// enclosing back edge to h (if any).
+func findLatch(I *flow.Interval) (*cfg.Node, bool) {
+	var latch *cfg.Node
+	for _, pred := range I.To(I.Head) {
+		p := node(pred)
+		if I.Has(p) && !p.InLoop {
+			if latch == nil {
+				latch = p
+			} else if p.Post > latch.Post {
+				latch = p
+			}
+		}
+	}
+	return latch, latch != nil
 }
 
 const dir = "_dump_"
@@ -130,4 +168,12 @@ func createGraph(g *cfg.Graph) {
 	if err := ioutil.WriteFile(path, buf, 0644); err != nil {
 		log.Fatalf("%+v", errors.WithStack(err))
 	}
+}
+
+// node asserts that the given node is a control flow graph node.
+func node(n graph.Node) *cfg.Node {
+	if n, ok := n.(*cfg.Node); ok {
+		return n
+	}
+	panic(fmt.Errorf("invalid node type; expected *cfg.Node, got %T", n))
 }
