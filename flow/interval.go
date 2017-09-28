@@ -8,9 +8,13 @@ package flow
 import (
 	"fmt"
 
+	"github.com/graphism/exp/cfg"
+
 	"gonum.org/v1/gonum/graph"
 )
 
+// Intervals returns the intervals contained within the given graph, based on
+// the entry node.
 func Intervals(g graph.Directed, entry graph.Node) []*Interval {
 	var intervals []*Interval
 	// 1. Establish a set H for header nodes and initialize it with n_0, the
@@ -55,7 +59,7 @@ func find2_2(g graph.Directed, entry graph.Node, I *Interval) (graph.Node, bool)
 	// 2.2. Add to I(h) any node all of whose immediate predecessors are
 	// already in I(h).
 loop:
-	for _, n := range g.Nodes() {
+	for _, n := range cfg.SortByRevPost(g.Nodes()) {
 		if n == entry {
 			continue
 		}
@@ -84,7 +88,7 @@ func find3(g graph.Directed, entry graph.Node, I *Interval, H *queue) (graph.Nod
 	// I(h) but which have immediate predecessors in I(h). Therefore a node is
 	// added to H the first time any (but not all) of its immediate predecessors
 	// become members of an interval.
-	for _, n := range g.Nodes() {
+	for _, n := range cfg.SortByRevPost(g.Nodes()) {
 		if H.has(n) {
 			// skip if already in H.
 			continue
@@ -109,12 +113,18 @@ func find3(g graph.Directed, entry graph.Node, I *Interval, H *queue) (graph.Nod
 
 // --- interval
 
+// An Interval I(h) is the maximal, single-entry subgraph in which h is the only
+// entry node and in which all closed paths contain h.
 type Interval struct {
-	g     graph.Directed
-	Head  graph.Node
+	// Graph in which the interval exists.
+	g graph.Directed
+	// Head specifies the entry node of the interval.
+	Head graph.Node
+	// nodes tracks the nodes contained within the interval.
 	nodes map[graph.Node]bool
 }
 
+// newInterval returns a new interval with the given header node.
 func newInterval(g graph.Directed, head graph.Node) *Interval {
 	return &Interval{
 		g:    g,
@@ -125,41 +135,51 @@ func newInterval(g graph.Directed, head graph.Node) *Interval {
 	}
 }
 
+// addNode adds the given node to the interval.
 func (I *Interval) addNode(n graph.Node) {
 	I.nodes[n] = true
 }
 
+// Has returns whether the node exists within the interval.
 func (I *Interval) Has(n graph.Node) bool {
 	return I.nodes[n]
 }
 
+// Nodes returns all the nodes in the interval.
 func (I *Interval) Nodes() []graph.Node {
 	var nodes []graph.Node
 	for n := range I.nodes {
 		nodes = append(nodes, n)
 	}
-	return nodes
+	return cfg.SortByRevPost(nodes)
 }
 
 // [skip start?] embed graph.Directed in Interval, and only implement Has and
 // [Nodes methods.
 
+// From returns all nodes that can be reached directly from the given node.
 func (I *Interval) From(n graph.Node) []graph.Node {
 	return I.g.From(n)
 }
 
+// HasEdgeBetween returns whether an edge exists between nodes x and y without
+// considering direction.
 func (I *Interval) HasEdgeBetween(x, y graph.Node) bool {
 	return I.g.HasEdgeBetween(x, y)
 }
 
+// Edge returns the edge from u to v if such an edge exists and nil otherwise.
+// The node v must be directly reachable from u as defined by the From method.
 func (I *Interval) Edge(u, v graph.Node) graph.Edge {
 	return I.g.Edge(u, v)
 }
 
+// HasEdgeFromTo returns whether an edge exists in the graph from u to v.
 func (I *Interval) HasEdgeFromTo(u, v graph.Node) bool {
 	return I.g.HasEdgeFromTo(u, v)
 }
 
+// To returns all nodes that can reach directly to the given node.
 func (I *Interval) To(n graph.Node) []graph.Node {
 	return I.g.To(n)
 }
@@ -168,23 +188,29 @@ func (I *Interval) To(n graph.Node) []graph.Node {
 
 // --- queue
 
+// A queue is a FIFO queue of nodes.
 type queue struct {
+	// List of nodes in queue.
 	l []graph.Node
+	// Current position in queue.
 	i int
 }
 
+// newQueue returns a new FIFO queue.
 func newQueue() *queue {
 	return &queue{
 		l: make([]graph.Node, 0),
 	}
 }
 
+// push appends the given node to the end of the queue.
 func (q *queue) push(n graph.Node) {
 	if !q.has(n) {
 		q.l = append(q.l, n)
 	}
 }
 
+// has reports whether the given node is present in the queue.
 func (q *queue) has(n graph.Node) bool {
 	for _, m := range q.l {
 		if n == m {
@@ -194,6 +220,7 @@ func (q *queue) has(n graph.Node) bool {
 	return false
 }
 
+// pop pops and returns the first node of the queue.
 func (q *queue) pop() graph.Node {
 	if q.empty() {
 		panic("invalid call to pop; empty queue")
@@ -203,6 +230,7 @@ func (q *queue) pop() graph.Node {
 	return n
 }
 
+// empty reports whether the queue is empty.
 func (q *queue) empty() bool {
 	return len(q.l[q.i:]) == 0
 }
