@@ -193,6 +193,8 @@ type Node struct {
 	LoopHead graph.Node
 	// Follow node of the loop.
 	LoopFollow graph.Node
+	// Follow node of the 2-way conditional.
+	Follow graph.Node
 }
 
 // LoopType specifies the type of a loop.

@@ -9,7 +9,7 @@ import (
 	"github.com/graphism/exp/cfg"
 	"github.com/graphism/exp/flow"
 	"github.com/pkg/errors"
-	"gonum.org/v1/gonum/graph/encoding/dot"
+	"github.com/sanity-io/litter"
 )
 
 func main() {
@@ -34,14 +34,16 @@ func dumpIntervals(path string) error {
 			fmt.Println("   n:", n)
 		}
 	}
-	gs := cfa.Structure(g)
-	for num, g := range gs {
-		name := fmt.Sprintf("G%d", num)
-		buf, err := dot.Marshal(g, name, "", "\t", false)
-		if err != nil {
-			return errors.WithStack(err)
-		}
-		fmt.Println(string(buf))
-	}
+	cfa.Structure(g)
+	litter.Dump(g.Nodes())
+	//gs := cfa.DerivedGraphSeq(g)
+	//for num, g := range gs {
+	//	name := fmt.Sprintf("G%d", num)
+	//	buf, err := dot.Marshal(g, name, "", "\t", false)
+	//	if err != nil {
+	//		return errors.WithStack(err)
+	//	}
+	//	fmt.Println(string(buf))
+	//}
 	return nil
 }

@@ -14,16 +14,18 @@ import (
 
 	"github.com/graphism/exp/cfg"
 	"github.com/graphism/exp/flow"
+	"github.com/kr/pretty"
 	"github.com/pkg/errors"
 	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/encoding/dot"
 	"gonum.org/v1/gonum/graph/path"
 )
 
-func Structure(g *cfg.Graph) []*cfg.Graph {
-	Gs := DerivedGraphSeq(g)
-	//loopStruct(g, Gs)
-	return Gs
+func Structure(g *cfg.Graph) {
+	cfg.InitDFSOrder(g)
+	//structLoop(g)
+	struct2Way(g)
+
 }
 
 // DerivedGraphSeq returns the derived sequence of graphs, G^1 ... G^n, based on
@@ -52,14 +54,17 @@ func DerivedGraphSeq(src *cfg.Graph) []*cfg.Graph {
 			newName := fmt.Sprintf("I%d", intNum)
 			delNodes := make(map[string]bool)
 			for _, n := range I.Nodes() {
-				nn, ok := n.(dot.Node)
-				if !ok {
-					panic(fmt.Errorf("invalid node type; expected dot.Node, got %T", n))
-				}
+				nn := node(n)
+				nn.Attrs["color"] = "red"
 				delNodes[nn.DOTID()] = true
 			}
+			// Dump pre-merge.
+			G.SetDOTID(G.DOTID() + "_a")
+			createGraph(G)
+
 			// The second order graph, G^2, is derived from G^1 by collapsing each
 			// interval in G^1 into a node.
+
 			G = cfg.Merge(G, delNodes, newName)
 			name := fmt.Sprintf("G%d_%d", i-1, intNum)
 			G.SetDOTID(name)
@@ -74,8 +79,9 @@ func DerivedGraphSeq(src *cfg.Graph) []*cfg.Graph {
 	return Gs
 }
 
-// loopStruct marks all nodes of G belonging to loops
-func loopStruct(G *cfg.Graph, Gs []*cfg.Graph) {
+// structLoop marks all nodes of G belonging to loops.
+func structLoop(G *cfg.Graph) {
+	Gs := DerivedGraphSeq(G)
 	for _, Gi := range Gs {
 		Is := flow.Intervals(Gi, Gi.Entry())
 		for _, Ii := range Is {
@@ -93,6 +99,57 @@ func loopStruct(G *cfg.Graph, Gs []*cfg.Graph) {
 			// TODO: add nodes part of loop to inLoop. (latch, Ii.head)
 		}
 	}
+}
+
+// struct2Way marks all nodes of G belonging to 2-way conditionals.
+//
+// Pre: G is a graph numbered in reverse postorder.
+//
+// Post: 2-way conditionals are marked in G. the follow node for all 2-way
+// conditionals is determined.
+func struct2Way(G *cfg.Graph) {
+	domtree := path.Dominators(G.Entry(), G)
+	// unresolved = {}
+	unresolved := make(map[graph.Node]bool)
+	// for (all nodes m in N in descending order)
+	for _, m := range cfg.SortByRevPost(G.Nodes()) {
+		/* TODO: add to the if-statement below && m.LoopHead != m && !m.IsLatch */
+		if len(G.From(m)) != 2 {
+			continue
+		}
+		if n, ok := find2WayFollow(G, m, domtree); ok {
+			// follow(m) = n
+			mm := node(m)
+			mm.Follow = n
+			// for (all x in unresolved)
+			for x := range unresolved {
+				// follow(x) = n
+				xx := node(x)
+				xx.Follow = n
+				// unresolved = unresolved - {x}
+				delete(unresolved, x)
+			}
+		} else {
+			// unresolved = unresolved U {m}
+			unresolved[m] = true
+		}
+	}
+	pretty.Println("unresolved:", unresolved)
+}
+
+// find2WayFollow locates the follow node of the 2-way conditional.
+func find2WayFollow(G *cfg.Graph, m graph.Node, domtree path.DominatorTree) (graph.Node, bool) {
+	// n = max{i | immedDom(i) == m and #inEdges(i) >= 2}
+	var n *cfg.Node
+	for _, i := range G.Nodes() {
+		if domtree.DominatorOf(i) == m && len(G.To(i)) >= 2 {
+			ii := node(i)
+			if n == nil || n.Post < ii.Post {
+				n = ii
+			}
+		}
+	}
+	return n, n != nil
 }
 
 // loop marks the nodes belonging to the loop determined by (head, latch), and
