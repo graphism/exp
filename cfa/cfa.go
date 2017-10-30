@@ -23,7 +23,7 @@ import (
 
 func Structure(g *cfg.Graph) {
 	cfg.InitDFSOrder(g)
-	//structLoop(g)
+	structLoops(g)
 	//struct2Way(g)
 }
 
@@ -54,21 +54,34 @@ func DerivedGraphSeq(src *cfg.Graph) []*cfg.Graph {
 			delNodes := make(map[string]bool)
 			for _, n := range I.Nodes() {
 				nn := node(n)
-				//nn.Attrs["fillcolor"] = "red"
-				//nn.Attrs["style"] = "filled"
+				nn.Attrs["fillcolor"] = "red"
+				nn.Attrs["style"] = "filled"
 				delNodes[nn.DOTID()] = true
 			}
 			// Dump pre-merge.
-			//G.SetDOTID(G.DOTID() + "_a")
-			//createGraph(G)
+			G.SetDOTID(G.DOTID() + "_a")
+			createGraph(G)
+			for _, n := range I.Nodes() {
+				nn := node(n)
+				delete(nn.Attrs, "fillcolor")
+				delete(nn.Attrs, "style")
+			}
 
 			// The second order graph, G^2, is derived from G^1 by collapsing each
 			// interval in G^1 into a node.
 
 			G = cfg.Merge(G, delNodes, newName)
-			name := fmt.Sprintf("G%d_%d", i-1, intNum)
+			n, ok := G.NodeWithName(newName)
+			if !ok {
+				panic(fmt.Errorf("unable to locate new node %q after merge", newName))
+			}
+			n.Attrs["fillcolor"] = "red"
+			n.Attrs["style"] = "filled"
+			name := fmt.Sprintf("G%d_b_%d", i-1, intNum)
 			G.SetDOTID(name)
 			createGraph(G)
+			delete(n.Attrs, "fillcolor")
+			delete(n.Attrs, "style")
 			intNum++
 		}
 		name := fmt.Sprintf("G%d", i)
@@ -79,25 +92,140 @@ func DerivedGraphSeq(src *cfg.Graph) []*cfg.Graph {
 	return Gs
 }
 
-// structLoop marks all nodes of G belonging to loops.
-func structLoop(G *cfg.Graph) {
+// structLoops marks all nodes of G belonging to loops.
+func structLoops(G *cfg.Graph) {
 	Gs := DerivedGraphSeq(G)
 	for _, Gi := range Gs {
+		cfg.InitDFSOrder(Gi)
 		Is := flow.Intervals(Gi, Gi.Entry())
 		for _, Ii := range Is {
+			// Find latch node of loop.
 			latch, ok := findLatch(Ii)
 			if !ok {
 				continue
 			}
-			latch.IsLatch = true
+			fmt.Println("latch:", latch)
+			head := node(Ii.Head)
+			head.Latch = latch
+
 			// TODO: Check latching node is at the same nesting level of case
 			// statements (if any).
-
 			// Mark nodes belonging to loop and determine type of loop.
 			loop(Ii, latch)
-
-			// TODO: add nodes part of loop to inLoop. (latch, Ii.head)
+			latch.IsLatch = true
 		}
+	}
+}
+
+// findLatch returns the latching node of I(h), the node with the greatest
+// enclosing back edge to h (if any).
+func findLatch(I *flow.Interval) (*cfg.Node, bool) {
+	var latch *cfg.Node
+	// Find greatest enclosing back edge (if any).
+	for _, pred := range I.To(I.Head) {
+		if !I.Has(pred) {
+			continue
+		}
+		p, h := node(pred), node(I.Head)
+		if !isBackEdge(p, h) {
+			continue
+		}
+		if latch == nil {
+			latch = p
+		} else if p.RevPost > latch.RevPost {
+			latch = p
+		}
+	}
+	return latch, latch != nil
+}
+
+// isBackEdge reports whether (pred, head) is a back edge. If head was visited
+// first during depth first search traversal (i.e. has a smaller Pre number), or
+// head == pred, then it is a back edge.
+func isBackEdge(pred, head *cfg.Node) bool {
+	return head.Pre < pred.Pre
+}
+
+// loop marks the nodes belonging to the loop determined by (latch, head), and
+// determines the loop type.
+func loop(I *flow.Interval, latch *cfg.Node) {
+	head := node(I.Head)
+	head.LoopHead = head
+	// nodes belonging to loop.
+	nodes := make(map[graph.Node]bool)
+	nodes[head] = true
+	// TODO: Consider moving idom computation Structure, and perform on G rather
+	// than I.
+	domtree := path.Dominators(head, I)
+	// Mark nodes in loop headed by head.
+	for _, n := range cfg.SortByRevPost(I.Nodes()) {
+		nn := node(n)
+		if nn.RevPost <= head.RevPost {
+			continue
+		}
+		if nn.RevPost >= latch.RevPost {
+			break
+		}
+		if idom := domtree.DominatorOf(n); !nodes[idom] {
+			continue
+		}
+		nodes[nn] = true
+		// Set loop header if not yet part of another loop.
+		if nn.LoopHead == nil {
+			nn.LoopHead = head
+		}
+	}
+	latch.LoopHead = head
+	nodes[latch] = true
+
+	// Determine loop type.
+	switch {
+	// 2-way latch node.
+	case len(I.From(latch)) == 2:
+		switch {
+		// 1-way header node.
+		case len(I.From(head)) == 1:
+			head.LoopType = cfg.LoopTypePostTest
+		// 2-way header node.
+		default:
+			// use heuristic to determine best type of loop.
+			panic("loop type detection heuristic not yet implemented for 2-way header node, 2-way latch node loops")
+		}
+	// 1-way latch node.
+	default:
+		switch {
+		// 2-way header node.
+		case len(I.From(head)) == 2:
+			head.LoopType = cfg.LoopTypePreTest
+		// 1-way header node.
+		default:
+			fmt.Println("latch:", latch)
+			fmt.Println("head:", head)
+			head.LoopType = cfg.LoopTypeEndless
+		}
+	}
+
+	// Determine loop follow.
+	switch head.LoopType {
+	case cfg.LoopTypePreTest:
+		// Follow node is the successor of the header node not part of loop nodes.
+		succs := I.From(head)
+		if nodes[succs[0]] {
+			head.Follow = succs[1]
+		} else {
+			head.Follow = succs[0]
+		}
+	case cfg.LoopTypePostTest:
+		// Follow node is the successor of the latch node not part of loop nodes.
+		succs := I.From(latch)
+		if nodes[succs[0]] {
+			head.Follow = succs[1]
+		} else {
+			head.Follow = succs[0]
+		}
+	case cfg.LoopTypeEndless:
+		// Determine follow node (if any) by traversing all nodes in the loop.
+		panic("determination of follow node for endless loops not yet implemented")
 	}
 }
 
@@ -158,57 +286,6 @@ func find2WayFollow(G *cfg.Graph, m graph.Node, domtree path.DominatorTree) (gra
 		}
 	}
 	return n, n != nil
-}
-
-// loop marks the nodes belonging to the loop determined by (head, latch), and
-// determines the loop type.
-func loop(I *flow.Interval, latch graph.Node) {
-	h := node(I.Head)
-	h.InLoop = true
-	h.LoopHead = h
-	l := node(latch)
-	l.InLoop = true
-	l.LoopHead = h
-	nodes := make(map[graph.Node]bool)
-	nodes[h] = true
-	// TODO: Consider moving idom computation Structure, and perform on G rather
-	// than I.
-	domtree := path.Dominators(h, I)
-	// Mark nodes in loop headed by head.
-	for _, n := range cfg.SortByRevPost(I.Nodes()) {
-		nn := node(n)
-		// TODO: validate use of RevPost.
-		if nn.RevPost <= h.RevPost || nn.RevPost >= l.RevPost {
-			continue
-		}
-		if idom := domtree.DominatorOf(n); !nodes[idom] {
-			continue
-		}
-		nodes[nn] = true
-		// Set loop header if not yet part of another loop.
-		if nn.LoopHead == nil {
-			nn.LoopHead = h
-		}
-	}
-	nodes[l] = true
-}
-
-// findLatch returns the latching node of I(h), the node with the greatest
-// enclosing back edge to h (if any).
-func findLatch(I *flow.Interval) (*cfg.Node, bool) {
-	var latch *cfg.Node
-	for _, pred := range I.To(I.Head) {
-		p := node(pred)
-		if I.Has(p) && !p.InLoop {
-			if latch == nil {
-				latch = p
-				// TODO: validate use of RevPost.
-			} else if p.RevPost > latch.RevPost {
-				latch = p
-			}
-		}
-	}
-	return latch, latch != nil
 }
 
 const dir = "_dump_"

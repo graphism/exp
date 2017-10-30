@@ -188,12 +188,12 @@ type Node struct {
 
 	// IsLatch specifies whether the node is a latch node.
 	IsLatch bool
-	// InLoop specifies whether the node is part of a loop.
-	InLoop bool
 	// Type of the loop.
 	LoopType LoopType
 	// Header node of the loop.
 	LoopHead graph.Node
+	// Latch node of the loop.
+	Latch graph.Node
 	// Follow node of the loop.
 	LoopFollow graph.Node
 	// Follow node of the 2-way conditional.
