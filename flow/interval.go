@@ -60,6 +60,8 @@ func find2_2(g graph.Directed, entry graph.Node, I *Interval) (graph.Node, bool)
 	// already in I(h).
 loop:
 	for _, n := range cfg.SortByRevPost(g.Nodes()) {
+		//fmt.Println("n:", n)
+		//fmt.Println("entry:", entry)
 		if n == entry {
 			continue
 		}

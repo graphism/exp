@@ -17,21 +17,23 @@ func InitDFSOrder(g *Graph) {
 	visited := make(map[graph.Node]bool)
 	// post-order
 	var walk func(n graph.Node)
-	i := 0
+	first := 0
+	last := len(g.Nodes()) - 1
 	walk = func(n graph.Node) {
 		nn, ok := n.(*Node)
 		if !ok {
 			panic(fmt.Errorf("invalid node type; exepcted *cfg.Node, got %T", n))
 		}
-		nn.Pre = i
+		nn.Pre = first
+		first++
 		visited[n] = true
 		for _, succ := range sortByDOTID(g.From(n)) {
 			if !visited[succ] {
 				walk(succ)
 			}
 		}
-		nn.Post = i
-		i++
+		nn.RevPost = last
+		last--
 	}
 	walk(g.entry)
 	// Ensure that all nodes have been visited.
@@ -53,8 +55,7 @@ func SortByRevPost(ns []graph.Node) []graph.Node {
 		if !ok {
 			panic(fmt.Errorf("invalid node type; exepcted *cfg.Node, got %T", ns[j]))
 		}
-		// Reverse post-order
-		return b.Post < a.Post
+		return a.RevPost < b.RevPost
 	}
 	sort.Slice(ns, less)
 	return ns

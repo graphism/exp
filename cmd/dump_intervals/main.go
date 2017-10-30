@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/graphism/exp/cfa"
 	"github.com/graphism/exp/cfg"
 	"github.com/graphism/exp/flow"
 	"github.com/pkg/errors"
-	"github.com/sanity-io/litter"
 )
 
 func main() {
@@ -35,7 +35,7 @@ func dumpIntervals(path string) error {
 		}
 	}
 	cfa.Structure(g)
-	litter.Dump(g.Nodes())
+	spew.Dump(g.Nodes())
 	//gs := cfa.DerivedGraphSeq(g)
 	//for num, g := range gs {
 	//	name := fmt.Sprintf("G%d", num)

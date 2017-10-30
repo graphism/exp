@@ -1,6 +1,8 @@
 package cfg
 
-import "gonum.org/v1/gonum/graph"
+import (
+	"gonum.org/v1/gonum/graph"
+)
 
 // Merge returns a new control flow graph where the specified nodes have been
 // collapsed into a single node with the new node name, and the predecessors and
@@ -11,7 +13,6 @@ func Merge(src *Graph, delNodes map[string]bool, newName string) *Graph {
 	preds := make(map[graph.Node]bool)
 	succs := make(map[graph.Node]bool)
 	newNode := dst.NewNodeWithName(newName)
-	dst.AddNode(newNode)
 	for delName := range delNodes {
 		delNode := dst.nodeWithName(delName)
 		if delNode.entry {
@@ -33,6 +34,9 @@ func Merge(src *Graph, delNodes map[string]bool, newName string) *Graph {
 		}
 		dst.RemoveNode(delNode)
 	}
+	// Add new node after removing old nodes, to prevent potential collision with
+	// previous entry node.
+	dst.AddNode(newNode)
 	// Add edges from predecessors to new node.
 	for pred := range preds {
 		e := dst.NewEdge(pred, newNode)

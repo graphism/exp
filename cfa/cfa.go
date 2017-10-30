@@ -24,8 +24,7 @@ import (
 func Structure(g *cfg.Graph) {
 	cfg.InitDFSOrder(g)
 	//structLoop(g)
-	struct2Way(g)
-
+	//struct2Way(g)
 }
 
 // DerivedGraphSeq returns the derived sequence of graphs, G^1 ... G^n, based on
@@ -55,12 +54,13 @@ func DerivedGraphSeq(src *cfg.Graph) []*cfg.Graph {
 			delNodes := make(map[string]bool)
 			for _, n := range I.Nodes() {
 				nn := node(n)
-				nn.Attrs["color"] = "red"
+				//nn.Attrs["fillcolor"] = "red"
+				//nn.Attrs["style"] = "filled"
 				delNodes[nn.DOTID()] = true
 			}
 			// Dump pre-merge.
-			G.SetDOTID(G.DOTID() + "_a")
-			createGraph(G)
+			//G.SetDOTID(G.DOTID() + "_a")
+			//createGraph(G)
 
 			// The second order graph, G^2, is derived from G^1 by collapsing each
 			// interval in G^1 into a node.
@@ -113,13 +113,19 @@ func struct2Way(G *cfg.Graph) {
 	unresolved := make(map[graph.Node]bool)
 	// for (all nodes m in N in descending order)
 	for _, m := range cfg.SortByRevPost(G.Nodes()) {
-		/* TODO: add to the if-statement below && m.LoopHead != m && !m.IsLatch */
+		mm := node(m)
+		//fmt.Println("mm:", mm.RevPost, mm.DOTID())
 		if len(G.From(m)) != 2 {
+			continue
+		}
+		if mm.LoopHead == m {
+			continue
+		}
+		if mm.IsLatch {
 			continue
 		}
 		if n, ok := find2WayFollow(G, m, domtree); ok {
 			// follow(m) = n
-			mm := node(m)
 			mm.Follow = n
 			// for (all x in unresolved)
 			for x := range unresolved {
@@ -140,11 +146,13 @@ func struct2Way(G *cfg.Graph) {
 // find2WayFollow locates the follow node of the 2-way conditional.
 func find2WayFollow(G *cfg.Graph, m graph.Node, domtree path.DominatorTree) (graph.Node, bool) {
 	// n = max{i | immedDom(i) == m and #inEdges(i) >= 2}
+	//mm := node(m)
 	var n *cfg.Node
 	for _, i := range G.Nodes() {
 		if domtree.DominatorOf(i) == m && len(G.To(i)) >= 2 {
 			ii := node(i)
-			if n == nil || n.Post < ii.Post {
+			//fmt.Printf("immdom of %v is %v\n", ii.DOTID(), mm.DOTID())
+			if n == nil || ii.RevPost > n.RevPost {
 				n = ii
 			}
 		}
@@ -169,7 +177,8 @@ func loop(I *flow.Interval, latch graph.Node) {
 	// Mark nodes in loop headed by head.
 	for _, n := range cfg.SortByRevPost(I.Nodes()) {
 		nn := node(n)
-		if nn.Post <= h.Post || nn.Post >= l.Post {
+		// TODO: validate use of RevPost.
+		if nn.RevPost <= h.RevPost || nn.RevPost >= l.RevPost {
 			continue
 		}
 		if idom := domtree.DominatorOf(n); !nodes[idom] {
@@ -193,7 +202,8 @@ func findLatch(I *flow.Interval) (*cfg.Node, bool) {
 		if I.Has(p) && !p.InLoop {
 			if latch == nil {
 				latch = p
-			} else if p.Post > latch.Post {
+				// TODO: validate use of RevPost.
+			} else if p.RevPost > latch.RevPost {
 				latch = p
 			}
 		}

@@ -118,21 +118,21 @@ func TestInitDFSOrder(t *testing.T) {
 			// [1]: https://pdfs.semanticscholar.org/48bf/d31773af7b67f9d1b003b8b8ac889f08271f.pdf
 			path: "testdata/sample.dot",
 			want: map[string]int{
-				"B1":  1,
-				"B2":  2,
-				"B3":  4,
-				"B4":  3,
-				"B5":  5,
-				"B6":  6,
-				"B7":  11,
-				"B8":  12,
-				"B9":  13,
-				"B10": 14,
-				"B11": 15,
-				"B12": 7,
-				"B13": 8,
-				"B14": 9,
-				"B15": 10,
+				"B1":  0,
+				"B2":  1,
+				"B3":  3,
+				"B4":  2,
+				"B5":  4,
+				"B6":  5,
+				"B7":  10,
+				"B8":  11,
+				"B9":  12,
+				"B10": 13,
+				"B11": 14,
+				"B12": 6,
+				"B13": 7,
+				"B14": 8,
+				"B15": 9,
 			},
 		},
 	}
@@ -153,7 +153,7 @@ func TestInitDFSOrder(t *testing.T) {
 				panic(fmt.Errorf("invalid node type; expected *cfg.Node, got %T", n))
 			}
 			// Compute reverse post-ordering.
-			got[nn.name] = len(in.Nodes()) - nn.Post
+			got[nn.name] = nn.RevPost
 		}
 		if !reflect.DeepEqual(got, gold.want) {
 			t.Errorf("%q; output mismatch; expected `%v`, got `%v`", gold.path, gold.want, got)

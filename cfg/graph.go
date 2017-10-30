@@ -130,6 +130,9 @@ func (g *Graph) RemoveNode(n graph.Node) {
 	g.DirectedGraph.RemoveNode(n)
 	nn := node(n)
 	delete(g.nodes, nn.name)
+	if nn.entry {
+		g.entry = nil
+	}
 }
 
 // --- [ graph.EdgeAdder ] -----------------------------------------------------
@@ -173,10 +176,10 @@ type Node struct {
 	// entry specifies whether the node is the entry node of the control flow
 	// graph.
 	entry bool
-	// Depth first search pre-visit number.
+	// Depth first search preorder visit number.
 	Pre int
-	// Depth first search post-visit number.
-	Post int
+	// Depth first search reverse postorder visit number.
+	RevPost int
 	// DOT attributes.
 	Attrs
 
