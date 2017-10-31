@@ -61,6 +61,23 @@ func SortByRevPost(ns []graph.Node) []graph.Node {
 	return ns
 }
 
+// SortByPost sorts the given list of nodes by post-order.
+func SortByPost(ns []graph.Node) []graph.Node {
+	less := func(i, j int) bool {
+		a, ok := ns[i].(*Node)
+		if !ok {
+			panic(fmt.Errorf("invalid node type; exepcted *cfg.Node, got %T", ns[i]))
+		}
+		b, ok := ns[j].(*Node)
+		if !ok {
+			panic(fmt.Errorf("invalid node type; exepcted *cfg.Node, got %T", ns[j]))
+		}
+		return b.RevPost < a.RevPost
+	}
+	sort.Slice(ns, less)
+	return ns
+}
+
 // sortByDOTID sorts the given list of nodes by DOT ID if present, and node ID
 // otherwise.
 func sortByDOTID(ns []graph.Node) []graph.Node {

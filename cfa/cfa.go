@@ -23,8 +23,8 @@ import (
 
 func Structure(g *cfg.Graph) {
 	cfg.InitDFSOrder(g)
-	structLoops(g)
-	//struct2Way(g)
+	//structLoops(g)
+	struct2Way(g)
 }
 
 // DerivedGraphSeq returns the derived sequence of graphs, G^1 ... G^n, based on
@@ -239,8 +239,13 @@ func struct2Way(G *cfg.Graph) {
 	domtree := path.Dominators(G.Entry(), G)
 	// unresolved = {}
 	unresolved := make(map[graph.Node]bool)
+
+	// Analyze in descending order (note that descending reverse postorder is
+	// equivalent to ascending postorder) since it is desirable to analyze the
+	// innermost nested conditional first, and then the outer ones.
+
 	// for (all nodes m in N in descending order)
-	for _, m := range cfg.SortByRevPost(G.Nodes()) {
+	for _, m := range cfg.SortByPost(G.Nodes()) {
 		mm := node(m)
 		//fmt.Println("mm:", mm.RevPost, mm.DOTID())
 		if len(G.From(m)) != 2 {
@@ -264,6 +269,9 @@ func struct2Way(G *cfg.Graph) {
 				delete(unresolved, x)
 			}
 		} else {
+			// unresolved nodes may be conditionals nested in another conditional
+			// structure.
+
 			// unresolved = unresolved U {m}
 			unresolved[m] = true
 		}
@@ -276,7 +284,7 @@ func find2WayFollow(G *cfg.Graph, m graph.Node, domtree path.DominatorTree) (gra
 	// n = max{i | immedDom(i) == m and #inEdges(i) >= 2}
 	//mm := node(m)
 	var n *cfg.Node
-	for _, i := range G.Nodes() {
+	for _, i := range cfg.SortByRevPost(G.Nodes()) {
 		if domtree.DominatorOf(i) == m && len(G.To(i)) >= 2 {
 			ii := node(i)
 			//fmt.Printf("immdom of %v is %v\n", ii.DOTID(), mm.DOTID())
