@@ -11,6 +11,8 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 
 	"github.com/graphism/exp/cfg"
 	"github.com/graphism/exp/flow"
@@ -301,7 +303,7 @@ func find2WayFollow(G *cfg.Graph, m graph.Node, domtree path.DominatorTree) (*cf
 
 // CompoundCond merges the basic blocks of compound conditions into single basic
 // blocks.
-func CompoundCond(g *cfg.Graph) {
+func CompoundCond(g *cfg.Graph) *cfg.Graph {
 	change := true
 	for change {
 		change = false
@@ -314,24 +316,41 @@ func CompoundCond(g *cfg.Graph) {
 			nn := node(n)
 			switch {
 			case compoundCondAND(g, nn):
-				// TODO: Merge basic blocks of compound AND condition into a single
-				// node.
 				fmt.Println("AND located at:", nn)
+				x := nn
+				y := g.TrueTarget(x)
+				e := g.FalseTarget(x)
+				t := g.TrueTarget(y)
+				g = mergeCond(g, x, y, e, t, "CondAND")
+				change = true
 			case compoundCondOR(g, nn):
-				// TODO: Merge basic blocks of compound OR condition into a single
-				// node.
 				fmt.Println("OR located at:", nn)
+				x := nn
+				t := g.TrueTarget(x)
+				y := g.FalseTarget(x)
+				e := g.FalseTarget(y)
+				g = mergeCond(g, x, y, e, t, "CondOR")
+				change = true
 			case compoundCondNAND(g, nn):
-				// TODO: Merge basic blocks of compound NAND condition into a single
-				// node.
 				fmt.Println("NAND located at:", nn)
+				x := nn
+				e := g.TrueTarget(x)
+				y := g.FalseTarget(x)
+				t := g.TrueTarget(y)
+				g = mergeCond(g, x, y, e, t, "CondNAND")
+				change = true
 			case compoundCondNOR(g, nn):
-				// TODO: Merge basic blocks of compound NOR condition into a single
-				// node.
 				fmt.Println("NOR located at:", nn)
+				x := nn
+				y := g.TrueTarget(x)
+				t := g.FalseTarget(x)
+				e := g.FalseTarget(y)
+				g = mergeCond(g, x, y, e, t, "CondNOR")
+				change = true
 			}
 		}
 	}
+	return g
 }
 
 // compoundCondAND reports whether a compound AND condition is headed at the
@@ -442,6 +461,40 @@ func compoundCondNOR(g *cfg.Graph, x *cfg.Node) bool {
 	return false
 }
 
+// mergeCond merges the nodes x and y of the given compound condition.
+//
+// Example merge for x AND y.
+//
+// Before
+//    x
+//    ↓ ↘
+//    ↓   y
+//    ↓ ↙   ↘
+//    e       t
+//
+// After
+//       x&&y
+//      ↙    ↘
+//    e        t
+func mergeCond(g *cfg.Graph, x, y, e, t *cfg.Node, name string) *cfg.Graph {
+	// Replace x and y node with new (x AND y) node.
+	delNodes := map[string]bool{
+		x.DOTID(): true,
+		y.DOTID(): true,
+	}
+	newName := fmt.Sprintf("%s_%s", unquote(x.DOTID()), name)
+	g = cfg.Merge(g, delNodes, newName)
+	n, ok := g.NodeWithName(newName)
+	if !ok {
+		panic(fmt.Errorf("unable to locate compound condition node %q", newName))
+	}
+	trueEdge := edge(g.Edge(n, t))
+	falseEdge := edge(g.Edge(n, e))
+	trueEdge.Attrs["label"] = "true"
+	falseEdge.Attrs["label"] = "false"
+	return g
+}
+
 // ### [ Helper functions ] ####################################################
 
 const dir = "_dump_"
@@ -476,4 +529,24 @@ func node(n graph.Node) *cfg.Node {
 		return n
 	}
 	panic(fmt.Errorf("invalid node type; expected *cfg.Node, got %T", n))
+}
+
+// edge asserts that the given edge is a control flow graph edge.
+func edge(e graph.Edge) *cfg.Edge {
+	if e, ok := e.(*cfg.Edge); ok {
+		return e
+	}
+	panic(fmt.Errorf("invalid edge type; expected *cfg.Edge, got %T", e))
+}
+
+// unquote returns an unquoted version of s.
+func unquote(s string) string {
+	if strings.HasPrefix(s, `"`) && strings.HasSuffix(s, `"`) {
+		s, err := strconv.Unquote(s)
+		if err != nil {
+			panic(fmt.Errorf("unable to unquote %q; %v", s, err))
+		}
+		return s
+	}
+	return s
 }

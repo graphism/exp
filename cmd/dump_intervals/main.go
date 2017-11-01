@@ -9,6 +9,7 @@ import (
 	"go/token"
 	"log"
 	"strconv"
+	"strings"
 
 	"gonum.org/v1/gonum/graph"
 
@@ -40,8 +41,8 @@ func dumpIntervals(path string) error {
 			fmt.Println("   n:", n)
 		}
 	}
+	g = cfa.CompoundCond(g)
 	cfa.Structure(g)
-	cfa.CompoundCond(g)
 	//spew.Dump(g.Nodes())
 	f := genFunc(g)
 	//pretty.Println("f:", f)
@@ -218,9 +219,12 @@ func node(n graph.Node) *cfg.Node {
 
 // unquote returns an unquoted version of s.
 func unquote(s string) string {
-	s, err := strconv.Unquote(s)
-	if err != nil {
-		panic(fmt.Errorf("unable to unquote %q; %v", s, err))
+	if strings.HasPrefix(s, `"`) && strings.HasSuffix(s, `"`) {
+		s, err := strconv.Unquote(s)
+		if err != nil {
+			panic(fmt.Errorf("unable to unquote %q; %v", s, err))
+		}
+		return s
 	}
 	return s
 }

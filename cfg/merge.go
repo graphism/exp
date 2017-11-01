@@ -10,7 +10,8 @@ import (
 func Merge(src *Graph, delNodes map[string]bool, newName string) *Graph {
 	dst := NewGraph()
 	Copy(dst, src)
-	preds := make(map[graph.Node]bool)
+	// preds marks predecessor nodes and records their edge attributes.
+	preds := make(map[graph.Node]Attrs)
 	succs := make(map[graph.Node]bool)
 	newNode := dst.NewNodeWithName(newName)
 	for delName := range delNodes {
@@ -22,7 +23,7 @@ func Merge(src *Graph, delNodes map[string]bool, newName string) *Graph {
 		for _, pred := range dst.To(delNode) {
 			p := node(pred)
 			if !delNodes[p.name] {
-				preds[dst.nodeWithName(p.name)] = true
+				preds[dst.nodeWithName(p.name)] = edge(dst.Edge(p, delNode)).Attrs
 			}
 		}
 		// Record successors not part of nodes.
@@ -38,8 +39,9 @@ func Merge(src *Graph, delNodes map[string]bool, newName string) *Graph {
 	// previous entry node.
 	dst.AddNode(newNode)
 	// Add edges from predecessors to new node.
-	for pred := range preds {
-		e := dst.NewEdge(pred, newNode)
+	for pred, attrs := range preds {
+		e := edge(dst.NewEdge(pred, newNode))
+		e.Attrs = attrs
 		dst.SetEdge(e)
 	}
 	// Add edges from new node to successors.
