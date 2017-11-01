@@ -59,13 +59,16 @@ func DerivedGraphSeq(src *cfg.Graph) []*cfg.Graph {
 				delNodes[nn.DOTID()] = true
 			}
 			// Dump pre-merge.
-			G.SetDOTID(G.DOTID() + "_a")
+			// Store graph DOTID before dump.
+			nameBak := G.DOTID()
+			G.SetDOTID(nameBak + "_a")
 			createGraph(G)
 			for _, n := range I.Nodes() {
 				nn := node(n)
 				delete(nn.Attrs, "fillcolor")
 				delete(nn.Attrs, "style")
 			}
+			G.SetDOTID(nameBak)
 
 			// The second order graph, G^2, is derived from G^1 by collapsing each
 			// interval in G^1 into a node.
@@ -211,17 +214,17 @@ func loop(I *flow.Interval, latch *cfg.Node) {
 		// Follow node is the successor of the header node not part of loop nodes.
 		succs := I.From(head)
 		if nodes[succs[0]] {
-			head.Follow = succs[1]
+			head.Follow = node(succs[1])
 		} else {
-			head.Follow = succs[0]
+			head.Follow = node(succs[0])
 		}
 	case cfg.LoopTypePostTest:
 		// Follow node is the successor of the latch node not part of loop nodes.
 		succs := I.From(latch)
 		if nodes[succs[0]] {
-			head.Follow = succs[1]
+			head.Follow = node(succs[1])
 		} else {
-			head.Follow = succs[0]
+			head.Follow = node(succs[0])
 		}
 	case cfg.LoopTypeEndless:
 		// Determine follow node (if any) by traversing all nodes in the loop.
@@ -280,7 +283,7 @@ func struct2Way(G *cfg.Graph) {
 }
 
 // find2WayFollow locates the follow node of the 2-way conditional.
-func find2WayFollow(G *cfg.Graph, m graph.Node, domtree path.DominatorTree) (graph.Node, bool) {
+func find2WayFollow(G *cfg.Graph, m graph.Node, domtree path.DominatorTree) (*cfg.Node, bool) {
 	// n = max{i | immedDom(i) == m and #inEdges(i) >= 2}
 	//mm := node(m)
 	var n *cfg.Node
@@ -295,6 +298,151 @@ func find2WayFollow(G *cfg.Graph, m graph.Node, domtree path.DominatorTree) (gra
 	}
 	return n, n != nil
 }
+
+// CompoundCond merges the basic blocks of compound conditions into single basic
+// blocks.
+func CompoundCond(g *cfg.Graph) {
+	change := true
+	for change {
+		change = false
+		// Traverse nodes in postorder, this way, the header node of a compound
+		// condition is analyzed first.
+		for _, n := range cfg.SortByRevPost(g.Nodes()) {
+			if len(g.From(n)) != 2 {
+				continue
+			}
+			nn := node(n)
+			switch {
+			case compoundCondAND(g, nn):
+				// TODO: Merge basic blocks of compound AND condition into a single
+				// node.
+				fmt.Println("AND located at:", nn)
+			case compoundCondOR(g, nn):
+				// TODO: Merge basic blocks of compound OR condition into a single
+				// node.
+				fmt.Println("OR located at:", nn)
+			case compoundCondNAND(g, nn):
+				// TODO: Merge basic blocks of compound NAND condition into a single
+				// node.
+				fmt.Println("NAND located at:", nn)
+			case compoundCondNOR(g, nn):
+				// TODO: Merge basic blocks of compound NOR condition into a single
+				// node.
+				fmt.Println("NOR located at:", nn)
+			}
+		}
+	}
+}
+
+// compoundCondAND reports whether a compound AND condition is headed at the
+// given node.
+func compoundCondAND(g *cfg.Graph, x *cfg.Node) bool {
+	// Check (x && y) case. The left and right edge represent the false and true
+	// branch, respectively, in the illustration below.
+	//
+	//    x AND y
+	//
+	//    x
+	//    ↓ ↘
+	//    ↓   y
+	//    ↓ ↙   ↘
+	//    e       t
+	//
+	y := g.TrueTarget(x)  // true branch
+	e := g.FalseTarget(x) // false branch
+	if len(g.To(y)) == 1 && len(g.From(y)) == 2 {
+		t := g.TrueTarget(y)   // true branch
+		e2 := g.FalseTarget(y) // false branch
+		if e == e2 {
+			return true
+		}
+		_ = t
+	}
+	return false
+}
+
+// compoundCondOR reports whether a compound OR condition is headed at the given
+// node.
+func compoundCondOR(g *cfg.Graph, x *cfg.Node) bool {
+	// Check (x || y) case. The left and right edge represent the false and true
+	// branch, respectively, in the illustration below.
+	//
+	//    x OR y
+	//
+	//            x
+	//          ↙ ↓
+	//        y   ↓
+	//      ↙   ↘ ↓
+	//    e       t
+	//
+	t := g.TrueTarget(x)  // true branch
+	y := g.FalseTarget(x) // false branch
+	if len(g.To(y)) == 1 && len(g.From(y)) == 2 {
+		t2 := g.TrueTarget(y) // true branch
+		e := g.FalseTarget(y) // false branch
+		if t == t2 {
+			return true
+		}
+		_ = e
+	}
+	return false
+}
+
+// compoundCondNAND reports whether a compound NAND condition is headed at the
+// given node.
+func compoundCondNAND(g *cfg.Graph, x *cfg.Node) bool {
+	// Check (!x && y) case. The left and right edge represent the false and true
+	// branch, respectively, in the illustration below.
+	//
+	//    !x AND y
+	//
+	//            x
+	//          ↙↙
+	//        y↙
+	//      ↙↙  ↘
+	//    e       t
+	//
+	e := g.TrueTarget(x)  // true branch
+	y := g.FalseTarget(x) // false branch
+	if len(g.To(y)) == 1 && len(g.From(y)) == 2 {
+		t := g.TrueTarget(y)   // true branch
+		e2 := g.FalseTarget(y) // false branch
+		if e == e2 {
+			return true
+		}
+		_ = t
+	}
+	return false
+}
+
+// compoundCondNOR reports whether a compound NOR condition is headed at the
+// given node.
+func compoundCondNOR(g *cfg.Graph, x *cfg.Node) bool {
+	// Check (!x || y) case. The left and right edge represent the false and true
+	// branch, respectively, in the illustration below.
+	//
+	//    !x OR y
+	//
+	//    x
+	//     ↘↘
+	//       ↘y
+	//      ↙  ↘↘
+	//    e       t
+	//
+	y := g.TrueTarget(x)  // true branch
+	t := g.FalseTarget(x) // false branch
+	if len(g.To(y)) == 1 && len(g.From(y)) == 2 {
+		t2 := g.TrueTarget(y) // true branch
+		e := g.FalseTarget(y) // false branch
+		if t == t2 {
+			return true
+		}
+		_ = e
+	}
+	return false
+}
+
+// ### [ Helper functions ] ####################################################
 
 const dir = "_dump_"
 

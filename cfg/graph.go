@@ -64,6 +64,50 @@ func (g *Graph) NodeWithName(name string) (*Node, bool) {
 	return n, ok
 }
 
+// TrueTarget returns the target node of the true branch from n.
+func (g *Graph) TrueTarget(n *Node) *Node {
+	succs := g.From(n)
+	if len(succs) != 2 {
+		panic(fmt.Errorf("invalid number of successors; expected 2, got %d", len(succs)))
+	}
+	succ1 := node(succs[0])
+	succ2 := node(succs[1])
+	e1 := edge(g.Edge(n, succ1))
+	e2 := edge(g.Edge(n, succ2))
+	e1Label := e1.Attrs["label"]
+	e2Label := e2.Attrs["label"]
+	switch {
+	case e1Label == "true" && e2Label == "false":
+		return succ1
+	case e1Label == "false" && e2Label == "true":
+		return succ2
+	default:
+		panic(fmt.Errorf(`unable to locate true branch based on edge label; expected "true" and "false", got %q and %q`, e1Label, e2Label))
+	}
+}
+
+// FalseTarget returns the target node of the false branch from n.
+func (g *Graph) FalseTarget(n *Node) *Node {
+	succs := g.From(n)
+	if len(succs) != 2 {
+		panic(fmt.Errorf("invalid number of successors; expected 2, got %d", len(succs)))
+	}
+	succ1 := node(succs[0])
+	succ2 := node(succs[1])
+	e1 := edge(g.Edge(n, succ1))
+	e2 := edge(g.Edge(n, succ2))
+	e1Label := e1.Attrs["label"]
+	e2Label := e2.Attrs["label"]
+	switch {
+	case e1Label == "true" && e2Label == "false":
+		return succ2
+	case e1Label == "false" && e2Label == "true":
+		return succ1
+	default:
+		panic(fmt.Errorf(`unable to locate false branch based on edge label; expected "true" and "false", got %q and %q`, e1Label, e2Label))
+	}
+}
+
 // initNodes initializes the mapping between node names and graph nodes.
 func (g *Graph) initNodes() {
 	for _, n := range g.Nodes() {
@@ -191,13 +235,13 @@ type Node struct {
 	// Type of the loop.
 	LoopType LoopType
 	// Header node of the loop.
-	LoopHead graph.Node
+	LoopHead *Node
 	// Latch node of the loop.
-	Latch graph.Node
+	Latch *Node
 	// Follow node of the loop.
-	LoopFollow graph.Node
+	LoopFollow *Node
 	// Follow node of the 2-way conditional.
-	Follow graph.Node
+	Follow *Node
 }
 
 // LoopType specifies the type of a loop.
@@ -268,12 +312,6 @@ type Edge struct {
 
 // Attributes returns the DOT attributes of the edge.
 func (e *Edge) Attributes() []encoding.Attribute {
-	if len(e.label) > 0 {
-		if prev, ok := e.Attrs["label"]; ok && prev != e.label {
-			panic(fmt.Errorf(`mismatch of edge DOT label; expected %q, got %q`, e.label, prev))
-		}
-		e.Attrs["label"] = e.label
-	}
 	return e.Attrs.Attributes()
 }
 
@@ -316,6 +354,14 @@ func node(n graph.Node) *Node {
 		return n
 	}
 	panic(fmt.Errorf("invalid node type; expected *cfg.Node, got %T", n))
+}
+
+// edge asserts that the given edge is a control flow graph edge.
+func edge(e graph.Edge) *Edge {
+	if e, ok := e.(*Edge); ok {
+		return e
+	}
+	panic(fmt.Errorf("invalid edge type; expected *cfg.Edge, got %T", e))
 }
 
 // nodeWithName returns the node with the given name.
