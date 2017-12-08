@@ -16,12 +16,15 @@ import (
 
 	"github.com/graphism/exp/cfg"
 	"github.com/graphism/exp/flow"
-	"github.com/kr/pretty"
+	"github.com/mewkiz/pkg/term"
 	"github.com/pkg/errors"
 	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/encoding/dot"
 	"gonum.org/v1/gonum/graph/path"
 )
+
+// dbg logs debug messages to standard error, with the prefix "interval:".
+var dbg = log.New(os.Stderr, term.RedBold("interval:")+" ", 0)
 
 func Structure(g *cfg.Graph) {
 	cfg.InitDFSOrder(g)
@@ -109,7 +112,7 @@ func structLoops(G *cfg.Graph) {
 			if !ok {
 				continue
 			}
-			fmt.Println("latch:", latch)
+			dbg.Println("latch:", latch)
 			head := node(Ii.Head)
 			head.Latch = latch
 
@@ -204,8 +207,8 @@ func loop(I *flow.Interval, latch *cfg.Node) {
 			head.LoopType = cfg.LoopTypePreTest
 		// 1-way header node.
 		default:
-			fmt.Println("latch:", latch)
-			fmt.Println("head:", head)
+			dbg.Println("latch:", latch)
+			dbg.Println("head:", head)
 			head.LoopType = cfg.LoopTypeEndless
 		}
 	}
@@ -252,7 +255,7 @@ func struct2Way(G *cfg.Graph) {
 	// for (all nodes m in N in descending order)
 	for _, m := range cfg.SortByPost(G.Nodes()) {
 		mm := node(m)
-		//fmt.Println("mm:", mm.RevPost, mm.DOTID())
+		//dbg.Println("mm:", mm.RevPost, mm.DOTID())
 		if len(G.From(m)) != 2 {
 			continue
 		}
@@ -281,7 +284,7 @@ func struct2Way(G *cfg.Graph) {
 			unresolved[m] = true
 		}
 	}
-	pretty.Println("unresolved:", unresolved)
+	//pretty.Println("unresolved:", unresolved)
 }
 
 // find2WayFollow locates the follow node of the 2-way conditional.
@@ -292,7 +295,7 @@ func find2WayFollow(G *cfg.Graph, m graph.Node, domtree path.DominatorTree) (*cf
 	for _, i := range cfg.SortByRevPost(G.Nodes()) {
 		if domtree.DominatorOf(i) == m && len(G.To(i)) >= 2 {
 			ii := node(i)
-			//fmt.Printf("immdom of %v is %v\n", ii.DOTID(), mm.DOTID())
+			//dbg.Printf("immdom of %v is %v\n", ii.DOTID(), mm.DOTID())
 			if n == nil || ii.RevPost > n.RevPost {
 				n = ii
 			}
@@ -316,7 +319,7 @@ func CompoundCond(g *cfg.Graph) *cfg.Graph {
 			nn := node(n)
 			switch {
 			case compoundCondAND(g, nn):
-				fmt.Println("AND located at:", nn)
+				dbg.Println("AND located at:", nn)
 				x := nn
 				y := g.TrueTarget(x)
 				e := g.FalseTarget(x)
@@ -324,7 +327,7 @@ func CompoundCond(g *cfg.Graph) *cfg.Graph {
 				g = mergeCond(g, x, y, e, t, "CondAND")
 				change = true
 			case compoundCondOR(g, nn):
-				fmt.Println("OR located at:", nn)
+				dbg.Println("OR located at:", nn)
 				x := nn
 				t := g.TrueTarget(x)
 				y := g.FalseTarget(x)
@@ -332,7 +335,7 @@ func CompoundCond(g *cfg.Graph) *cfg.Graph {
 				g = mergeCond(g, x, y, e, t, "CondOR")
 				change = true
 			case compoundCondNAND(g, nn):
-				fmt.Println("NAND located at:", nn)
+				dbg.Println("NAND located at:", nn)
 				x := nn
 				e := g.TrueTarget(x)
 				y := g.FalseTarget(x)
@@ -340,7 +343,7 @@ func CompoundCond(g *cfg.Graph) *cfg.Graph {
 				g = mergeCond(g, x, y, e, t, "CondNAND")
 				change = true
 			case compoundCondNOR(g, nn):
-				fmt.Println("NOR located at:", nn)
+				dbg.Println("NOR located at:", nn)
 				x := nn
 				y := g.TrueTarget(x)
 				t := g.FalseTarget(x)

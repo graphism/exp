@@ -8,6 +8,7 @@ import (
 	"go/printer"
 	"go/token"
 	"log"
+	"os"
 	"strconv"
 	"strings"
 
@@ -16,8 +17,12 @@ import (
 	"github.com/graphism/exp/cfa"
 	"github.com/graphism/exp/cfg"
 	"github.com/graphism/exp/flow"
+	"github.com/mewkiz/pkg/term"
 	"github.com/pkg/errors"
 )
+
+// dbg logs debug messages to standard error, with the prefix "interval:".
+var dbg = log.New(os.Stderr, term.RedBold("interval:")+" ", 0)
 
 func main() {
 	flag.Parse()
@@ -29,16 +34,16 @@ func main() {
 }
 
 func dumpIntervals(path string) error {
-	fmt.Printf("\n=== [ %s ] ===\n\n", path)
+	dbg.Printf("\n=== [ %s ] ===\n\n", path)
 	g, err := cfg.ParseFile(path)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 	is := flow.Intervals(g, g.Entry())
 	for _, i := range is {
-		fmt.Println("head:", i.Head)
+		dbg.Println("head:", i.Head)
 		for _, n := range i.Nodes() {
-			fmt.Println("   n:", n)
+			dbg.Println("   n:", n)
 		}
 	}
 	g = cfa.CompoundCond(g)
@@ -78,8 +83,8 @@ func genFunc(g *cfg.Graph) *ast.FuncDecl {
 		cur:  &ast.BlockStmt{},
 	}
 	entry := node(g.Entry())
-	fmt.Println("entry:", entry)
-	fmt.Println("entry.Follow:", entry.Follow)
+	dbg.Println("entry:", entry)
+	dbg.Println("entry.Follow:", entry.Follow)
 	gen.genCode(entry, entry.Follow)
 	return &ast.FuncDecl{
 		Name: ast.NewIdent(name),
@@ -91,8 +96,8 @@ func genFunc(g *cfg.Graph) *ast.FuncDecl {
 }
 
 func (gen *generator) genCode(n, ifFollow *cfg.Node) {
-	fmt.Println("==> n:", n)
-	fmt.Println("==> ifFollow:", ifFollow)
+	dbg.Println("==> n:", n)
+	dbg.Println("==> ifFollow:", ifFollow)
 	// Break early if node is the follow node of an if-statement.
 	if ifFollow != nil && n == ifFollow {
 		return
@@ -146,8 +151,8 @@ func (gen *generator) genCode(n, ifFollow *cfg.Node) {
 		case t == n.Follow:
 			// if-then
 			//    false branch is body.
-			fmt.Println("if:", n.DOTID())
-			fmt.Println("   then:", node(f).DOTID())
+			dbg.Println("if:", n.DOTID())
+			dbg.Println("   then:", node(f).DOTID())
 			body := &ast.BlockStmt{}
 			gen.cur = body
 			gen.genCode(f, n.Follow)
@@ -163,8 +168,8 @@ func (gen *generator) genCode(n, ifFollow *cfg.Node) {
 		case f == n.Follow:
 			// if-then
 			//    true branch is body.
-			fmt.Println("if:", n.DOTID())
-			fmt.Println("   then:", node(t).DOTID())
+			dbg.Println("if:", n.DOTID())
+			dbg.Println("   then:", node(t).DOTID())
 			body := &ast.BlockStmt{}
 			gen.cur = body
 			gen.genCode(t, n.Follow)
@@ -179,9 +184,9 @@ func (gen *generator) genCode(n, ifFollow *cfg.Node) {
 			gen.cur.List = append(gen.cur.List, stmt)
 		default:
 			// if-else
-			fmt.Println("if:", n.DOTID())
-			fmt.Println("   then:", node(t).DOTID())
-			fmt.Println("   else:", node(f).DOTID())
+			dbg.Println("if:", n.DOTID())
+			dbg.Println("   then:", node(t).DOTID())
+			dbg.Println("   else:", node(f).DOTID())
 			trueBody := &ast.BlockStmt{}
 			gen.cur = trueBody
 			gen.genCode(t, n.Follow)
@@ -200,7 +205,7 @@ func (gen *generator) genCode(n, ifFollow *cfg.Node) {
 			gen.cur.List = append(gen.cur.List, stmt)
 		}
 		// Continue with the follow.
-		fmt.Println("### >> n.Follow", n.Follow)
+		dbg.Println("### >> n.Follow", n.Follow)
 		gen.genCode(n.Follow, n.Follow.Follow)
 	default:
 		panic(fmt.Errorf("support for node with %d successors not yet implemented", len(g.From(n))))

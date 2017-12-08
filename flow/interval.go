@@ -7,11 +7,17 @@ package flow
 
 import (
 	"fmt"
+	"log"
+	"os"
 
 	"github.com/graphism/exp/cfg"
+	"github.com/mewkiz/pkg/term"
 
 	"gonum.org/v1/gonum/graph"
 )
+
+// dbg logs debug messages to standard error, with the prefix "interval:".
+var dbg = log.New(os.Stderr, term.RedBold("interval:")+" ", 0)
 
 // Intervals returns the intervals contained within the given graph, based on
 // the entry node.
@@ -60,8 +66,8 @@ func find2_2(g graph.Directed, entry graph.Node, I *Interval) (graph.Node, bool)
 	// already in I(h).
 loop:
 	for _, n := range cfg.SortByRevPost(g.Nodes()) {
-		//fmt.Println("n:", n)
-		//fmt.Println("entry:", entry)
+		//dbg.Println("n:", n)
+		//dbg.Println("entry:", entry)
 		if n == entry {
 			continue
 		}
