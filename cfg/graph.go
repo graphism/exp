@@ -240,6 +240,8 @@ type Node struct {
 	// TODO: Figure out if we can move this information somewhere else; e.g.
 	// local variables in loopStruct.
 
+	// Number of back edges to the node.
+	NBackEdges int
 	// IsLatch specifies whether the node is a latch node.
 	IsLatch bool
 	// Type of the loop.

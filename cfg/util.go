@@ -45,7 +45,7 @@ func InitDFSOrder(g *Graph) {
 }
 
 // SortByRevPost sorts the given list of nodes by reverse post-order.
-func SortByRevPost(ns []graph.Node) []graph.Node {
+func SortByRevPost(ns []graph.Node) []*Node {
 	less := func(i, j int) bool {
 		a, ok := ns[i].(*Node)
 		if !ok {
@@ -58,11 +58,15 @@ func SortByRevPost(ns []graph.Node) []graph.Node {
 		return a.RevPost < b.RevPost
 	}
 	sort.Slice(ns, less)
-	return ns
+	var nodes []*Node
+	for _, n := range ns {
+		nodes = append(nodes, node(n))
+	}
+	return nodes
 }
 
 // SortByPost sorts the given list of nodes by post-order.
-func SortByPost(ns []graph.Node) []graph.Node {
+func SortByPost(ns []graph.Node) []*Node {
 	less := func(i, j int) bool {
 		a, ok := ns[i].(*Node)
 		if !ok {
@@ -75,7 +79,11 @@ func SortByPost(ns []graph.Node) []graph.Node {
 		return b.RevPost < a.RevPost
 	}
 	sort.Slice(ns, less)
-	return ns
+	var nodes []*Node
+	for _, n := range ns {
+		nodes = append(nodes, node(n))
+	}
+	return nodes
 }
 
 // sortByDOTID sorts the given list of nodes by DOT ID if present, and node ID
