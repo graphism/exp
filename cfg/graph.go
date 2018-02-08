@@ -46,6 +46,16 @@ func (g *Graph) Entry() graph.Node {
 	return g.entry
 }
 
+// SetEntry sets the entry node of the control flow graph.
+func (g *Graph) SetEntry(n graph.Node) {
+	nn := node(n)
+	if g.entry != nil {
+		panic(fmt.Errorf("cannot set %q as entry node; entry node %q already present", nn.DOTID(), node(g.entry).DOTID()))
+	}
+	nn.entry = true
+	g.entry = nn
+}
+
 // NewNodeWithName returns a new node with the given name.
 func (g *Graph) NewNodeWithName(name string) *Node {
 	if len(name) == 0 {

@@ -122,19 +122,21 @@ func (gen *generator) genCode(n, ifFollow *cfg.Node) {
 	switch len(succs) {
 	// Return statement.
 	case 0:
-		stmt := &ast.LabeledStmt{
+		labelStmt := &ast.LabeledStmt{
 			Label: label,
-			Stmt:  &ast.ReturnStmt{},
+			Stmt:  &ast.EmptyStmt{},
 		}
+		gen.cur.List = append(gen.cur.List, labelStmt)
+		stmt := &ast.ReturnStmt{}
 		gen.cur.List = append(gen.cur.List, stmt)
 		return
 	// Sequence.
 	case 1:
-		stmt := &ast.LabeledStmt{
+		labelStmt := &ast.LabeledStmt{
 			Label: label,
 			Stmt:  &ast.EmptyStmt{},
 		}
-		gen.cur.List = append(gen.cur.List, stmt)
+		gen.cur.List = append(gen.cur.List, labelStmt)
 		gen.genCode(node(succs[0]), ifFollow)
 		return
 	// Two-way conditional or loop.
@@ -156,14 +158,16 @@ func (gen *generator) genCode(n, ifFollow *cfg.Node) {
 			body := &ast.BlockStmt{}
 			gen.cur = body
 			gen.genCode(f, n.Follow)
-			stmt := &ast.LabeledStmt{
+			labelStmt := &ast.LabeledStmt{
 				Label: label,
-				Stmt: &ast.IfStmt{
-					Cond: ast.NewIdent("cond"),
-					Body: body,
-				},
+				Stmt:  &ast.EmptyStmt{},
+			}
+			stmt := &ast.IfStmt{
+				Cond: ast.NewIdent("cond"),
+				Body: body,
 			}
 			gen.cur = bak
+			gen.cur.List = append(gen.cur.List, labelStmt)
 			gen.cur.List = append(gen.cur.List, stmt)
 		case f == n.Follow:
 			// if-then
@@ -173,14 +177,16 @@ func (gen *generator) genCode(n, ifFollow *cfg.Node) {
 			body := &ast.BlockStmt{}
 			gen.cur = body
 			gen.genCode(t, n.Follow)
-			stmt := &ast.LabeledStmt{
+			labelStmt := &ast.LabeledStmt{
 				Label: label,
-				Stmt: &ast.IfStmt{
-					Cond: ast.NewIdent("cond"),
-					Body: body,
-				},
+				Stmt:  &ast.EmptyStmt{},
+			}
+			stmt := &ast.IfStmt{
+				Cond: ast.NewIdent("cond"),
+				Body: body,
 			}
 			gen.cur = bak
+			gen.cur.List = append(gen.cur.List, labelStmt)
 			gen.cur.List = append(gen.cur.List, stmt)
 		default:
 			// if-else
@@ -193,15 +199,17 @@ func (gen *generator) genCode(n, ifFollow *cfg.Node) {
 			falseBody := &ast.BlockStmt{}
 			gen.cur = falseBody
 			gen.genCode(f, n.Follow)
-			stmt := &ast.LabeledStmt{
+			labelStmt := &ast.LabeledStmt{
 				Label: label,
-				Stmt: &ast.IfStmt{
-					Cond: ast.NewIdent("cond"),
-					Body: trueBody,
-					Else: falseBody,
-				},
+				Stmt:  &ast.EmptyStmt{},
+			}
+			stmt := &ast.IfStmt{
+				Cond: ast.NewIdent("cond"),
+				Body: trueBody,
+				Else: falseBody,
 			}
 			gen.cur = bak
+			gen.cur.List = append(gen.cur.List, labelStmt)
 			gen.cur.List = append(gen.cur.List, stmt)
 		}
 		// Continue with the follow.

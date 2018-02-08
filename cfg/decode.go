@@ -48,7 +48,11 @@ func ParseBytes(b []byte) (*Graph, error) {
 		}
 	}
 	if g.entry == nil {
-		panic(`unable to locate entry node; missing DOT node with label attribute "entry"`)
+		n, ok := g.NodeWithName(`"0"`)
+		if !ok {
+			panic(`unable to locate entry note or node with name "0"`)
+		}
+		g.SetEntry(n)
 	}
 	return g, nil
 }
