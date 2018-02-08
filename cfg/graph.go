@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"github.com/graphism/simple"
+	"github.com/llir/llvm/ir"
 	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/encoding"
 	"gonum.org/v1/gonum/graph/encoding/dot"
@@ -30,6 +31,74 @@ func NewGraph() *Graph {
 		DirectedGraph: simple.NewDirectedGraph(),
 		nodes:         make(map[string]*Node),
 	}
+}
+
+// NewGraphFromFunc returns a new control flow graph based on the given
+// function.
+func NewGraphFromFunc(f *ir.Function) *Graph {
+	g := NewGraph()
+	// Force generate local IDs.
+	_ = f.String()
+	for i, block := range f.Blocks {
+		from := nodeWithName(g, block.Name)
+		if i == 0 {
+			// Store entry node.
+			g.SetEntry(from)
+		}
+		switch term := block.Term.(type) {
+		case *ir.TermRet:
+			// nothing to do.
+		case *ir.TermBr:
+			to := nodeWithName(g, term.Target.Name)
+			edgeWithLabel(g, from, to, "")
+		case *ir.TermCondBr:
+			t := nodeWithName(g, term.TargetTrue.Name)
+			f := nodeWithName(g, term.TargetFalse.Name)
+			edgeWithLabel(g, from, t, "true")
+			edgeWithLabel(g, from, f, "false")
+		case *ir.TermSwitch:
+			for _, c := range term.Cases {
+				to := nodeWithName(g, c.Target.Name)
+				label := fmt.Sprintf("case (x=%v)", c.X.Ident())
+				edgeWithLabel(g, from, to, label)
+			}
+			to := nodeWithName(g, term.TargetDefault.Name)
+			edgeWithLabel(g, from, to, "default case")
+		case *ir.TermUnreachable:
+			// nothing to do.
+		default:
+			panic(fmt.Errorf("support for terminator %T not yet implemented", term))
+		}
+	}
+	return g
+}
+
+// nodeWithName returns the node of the given name. A new node is created if not
+// yet present in the control flow graph.
+func nodeWithName(g *Graph, name string) *Node {
+	if n, ok := g.NodeWithName(name); ok {
+		return n
+	}
+	n := g.NewNodeWithName(name)
+	g.AddNode(n)
+	return n
+}
+
+// edgeWithLabel adds a directed edge between the specified nodes and assignes
+// it the given label.
+func edgeWithLabel(g *Graph, from, to *Node, label string) *Edge {
+	e := edge(g.NewEdge(from, to))
+	if len(label) > 0 {
+		e.Attrs["label"] = label
+		switch label {
+		case "true":
+			e.Attrs["color"] = "darkgreen"
+		case "false":
+			e.Attrs["color"] = "red"
+		}
+	}
+	g.SetEdge(e)
+	return e
 }
 
 // String returns the string representation of the graph in Graphviz DOT format.
@@ -256,16 +325,24 @@ type Node struct {
 	Follow *Node
 }
 
+//go:generate stringer -type LoopType -linecomment
+
 // LoopType specifies the type of a loop.
 type LoopType uint
 
 // Loop types.
 const (
-	LoopTypeNone     LoopType = iota
-	LoopTypePreTest           // pre-test loop
-	LoopTypePostTest          // post-test loop
-	LoopTypeEndless           // infinite loop
+	LoopTypeNone     LoopType = iota // none
+	LoopTypePreTest                  // pre-test_loop
+	LoopTypePostTest                 // post-test_loop
+	LoopTypeEndless                  // endless_loop
 )
+
+// MarshalText encodes the loop type into UTF-8-encoded text and returns the
+// result; implements encoding.TextMarshaler.
+func (t LoopType) MarshalText() ([]byte, error) {
+	return []byte(t.String()), nil
+}
 
 // --- [ dot.Node ] ------------------------------------------------------------
 
@@ -314,8 +391,6 @@ func (n *Node) SetAttribute(attr encoding.Attribute) error {
 // Edge is an edge in a control flow graph.
 type Edge struct {
 	graph.Edge
-	// Edge label.
-	label string
 	// DOT attributes.
 	Attrs
 }
