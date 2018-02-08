@@ -7,6 +7,7 @@ import (
 
 	"github.com/graphism/simple"
 	"github.com/llir/llvm/ir"
+	"github.com/pkg/errors"
 	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/encoding"
 	"gonum.org/v1/gonum/graph/encoding/dot"
@@ -342,6 +343,25 @@ const (
 // result; implements encoding.TextMarshaler.
 func (t LoopType) MarshalText() ([]byte, error) {
 	return []byte(t.String()), nil
+}
+
+// UnmarshalText decodes the loop type from the UTF-8 encoded text; implements
+// encoding.TextUnmarshaler.
+func (t *LoopType) UnmarshalText(b []byte) error {
+	s := string(b)
+	switch s {
+	case "none":
+		*t = LoopTypeNone
+	case "pre-test_loop":
+		*t = LoopTypePreTest
+	case "post-test_loop":
+		*t = LoopTypePostTest
+	case "endless_loop":
+		*t = LoopTypeEndless
+	default:
+		return errors.Errorf("support for unmarshalling loop type %q not yet implemented", s)
+	}
+	return nil
 }
 
 // --- [ dot.Node ] ------------------------------------------------------------
