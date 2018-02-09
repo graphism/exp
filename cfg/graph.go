@@ -4,6 +4,8 @@ package cfg
 import (
 	"fmt"
 	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/graphism/simple"
 	"github.com/llir/llvm/ir"
@@ -449,6 +451,13 @@ func (a Attrs) Attributes() []encoding.Attribute {
 		attr := encoding.Attribute{
 			Key:   key,
 			Value: a[key],
+		}
+		// Quote label string if containing spaces.
+		if key == "label" {
+			s := attr.Value
+			if strings.Contains(s, " ") && !strings.HasPrefix(s, `"`) {
+				attr.Value = strconv.Quote(s)
+			}
 		}
 		attrs = append(attrs, attr)
 	}
