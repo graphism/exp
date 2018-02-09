@@ -323,7 +323,7 @@ type Node struct {
 	// Follow node of the loop.
 	LoopFollow *Node
 	// Follow node of the 2-way conditional.
-	Follow *Node
+	IfFollow *Node
 }
 
 //go:generate stringer -type LoopType -linecomment
