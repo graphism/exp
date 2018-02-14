@@ -326,6 +326,10 @@ type Node struct {
 	LoopFollow *Node
 	// Follow node of the 2-way conditional.
 	IfFollow *Node
+	// Switch header node.
+	SwitchHead *Node
+	// Switch follow node.
+	SwitchFollow *Node
 }
 
 //go:generate stringer -type LoopType -linecomment
