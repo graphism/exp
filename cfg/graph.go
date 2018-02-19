@@ -3,16 +3,28 @@ package cfg
 
 import (
 	"fmt"
+	"log"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/graphism/simple"
 	"github.com/llir/llvm/ir"
+	"github.com/mewkiz/pkg/term"
 	"github.com/pkg/errors"
 	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/encoding"
 	"gonum.org/v1/gonum/graph/encoding/dot"
+)
+
+var (
+	// dbg represents a logger with the "cfg:" prefix, which logs debug messages
+	// to standard error.
+	dbg = log.New(os.Stderr, term.BlueBold("cfg:")+" ", 0)
+	// warn represents a logger with the "cfg:" prefix, which logs warnings to
+	// standard error.
+	warn = log.New(os.Stderr, term.RedBold("cfg:")+" ", 0)
 )
 
 // === [ Graph ] ===============================================================
@@ -164,7 +176,11 @@ func (g *Graph) TrueTarget(n *Node) *Node {
 	case e1Label == "false" && e2Label == "true":
 		return succ2
 	default:
-		panic(fmt.Errorf(`unable to locate true branch based on edge label; expected "true" and "false", got %q and %q`, e1Label, e2Label))
+		// TODO: Figure out how to track edges of true- and false-branches in
+		// between merges. For now, simply return the first successor (this will
+		// lead to incorrect results, but at least lets us progress).
+		warn.Printf(`unable to locate true branch of edges (%q -> %q) and (%q -> %q) based on edge label; expected "true" and "false", got %q and %q`, n.DOTID(), succ1.DOTID(), n.DOTID(), succ2.DOTID(), e1Label, e2Label)
+		return succ1
 	}
 }
 
@@ -186,7 +202,11 @@ func (g *Graph) FalseTarget(n *Node) *Node {
 	case e1Label == "false" && e2Label == "true":
 		return succ1
 	default:
-		panic(fmt.Errorf(`unable to locate false branch based on edge label; expected "true" and "false", got %q and %q`, e1Label, e2Label))
+		// TODO: Figure out how to track edges of true- and false-branches in
+		// between merges. For now, simply return the first successor (this will
+		// lead to incorrect results, but at least lets us progress).
+		warn.Printf(`unable to locate false branch of edges (%q -> %q) and (%q -> %q) based on edge label; expected "true" and "false", got %q and %q`, n.DOTID(), succ1.DOTID(), n.DOTID(), succ2.DOTID(), e1Label, e2Label)
+		return succ1
 	}
 }
 
