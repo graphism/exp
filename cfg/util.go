@@ -27,7 +27,7 @@ func InitDFSOrder(g *Graph) {
 		nn.Pre = first
 		first++
 		visited[n] = true
-		for _, succ := range sortByDOTID(g.From(n)) {
+		for _, succ := range sortByDOTID(g.From(n.ID())) {
 			if !visited[succ] {
 				walk(succ)
 			}

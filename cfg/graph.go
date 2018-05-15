@@ -160,14 +160,14 @@ func (g *Graph) NodeWithName(name string) (*Node, bool) {
 
 // TrueTarget returns the target node of the true branch from n.
 func (g *Graph) TrueTarget(n *Node) *Node {
-	succs := g.From(n)
+	succs := g.From(n.ID())
 	if len(succs) != 2 {
 		panic(fmt.Errorf("invalid number of successors; expected 2, got %d", len(succs)))
 	}
 	succ1 := node(succs[0])
 	succ2 := node(succs[1])
-	e1 := edge(g.Edge(n, succ1))
-	e2 := edge(g.Edge(n, succ2))
+	e1 := edge(g.Edge(n.ID(), succ1.ID()))
+	e2 := edge(g.Edge(n.ID(), succ2.ID()))
 	e1Label := e1.Attrs["label"]
 	e2Label := e2.Attrs["label"]
 	switch {
@@ -186,14 +186,14 @@ func (g *Graph) TrueTarget(n *Node) *Node {
 
 // FalseTarget returns the target node of the false branch from n.
 func (g *Graph) FalseTarget(n *Node) *Node {
-	succs := g.From(n)
+	succs := g.From(n.ID())
 	if len(succs) != 2 {
 		panic(fmt.Errorf("invalid number of successors; expected 2, got %d", len(succs)))
 	}
 	succ1 := node(succs[0])
 	succ2 := node(succs[1])
-	e1 := edge(g.Edge(n, succ1))
-	e2 := edge(g.Edge(n, succ2))
+	e1 := edge(g.Edge(n.ID(), succ1.ID()))
+	e2 := edge(g.Edge(n.ID(), succ2.ID()))
 	e1Label := e1.Attrs["label"]
 	e2Label := e2.Attrs["label"]
 	switch {
@@ -273,7 +273,7 @@ func (g *Graph) AddNode(n graph.Node) {
 // RemoveNode removes a node from the graph, as well as any edges attached to
 // it. If the node is not in the graph it is a no-op.
 func (g *Graph) RemoveNode(n graph.Node) {
-	g.DirectedGraph.RemoveNode(n)
+	g.DirectedGraph.RemoveNode(n.ID())
 	nn := node(n)
 	delete(g.nodes, nn.name)
 	if nn.entry {
@@ -302,10 +302,10 @@ func (g *Graph) SetEdge(e graph.Edge) {
 	}
 	// Add nodes if not yet present in graph.
 	from, to := ee.From(), ee.To()
-	if !g.Has(from) {
+	if !g.Has(from.ID()) {
 		g.AddNode(from)
 	}
-	if !g.Has(to) {
+	if !g.Has(to.ID()) {
 		g.AddNode(to)
 	}
 	// Add edge.

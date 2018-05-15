@@ -84,8 +84,8 @@ func genFunc(g *cfg.Graph) *ast.FuncDecl {
 	}
 	entry := node(g.Entry())
 	dbg.Println("entry:", entry)
-	dbg.Println("entry.Follow:", entry.Follow)
-	gen.genCode(entry, entry.Follow)
+	dbg.Println("entry.Follow:", entry.LoopFollow)
+	gen.genCode(entry, entry.LoopFollow)
 	return &ast.FuncDecl{
 		Name: ast.NewIdent(name),
 		Type: &ast.FuncType{
@@ -118,7 +118,7 @@ func (gen *generator) genCode(n, ifFollow *cfg.Node) {
 	// TODO: Add support for loops.
 
 	g := gen.g
-	succs := g.From(n)
+	succs := g.From(n.ID())
 	switch len(succs) {
 	// Return statement.
 	case 0:
@@ -141,23 +141,23 @@ func (gen *generator) genCode(n, ifFollow *cfg.Node) {
 		return
 	// Two-way conditional or loop.
 	case 2:
-		if n.Follow == nil {
+		if n.IfFollow == nil {
 			panic(fmt.Errorf("support for unresolved 2-way nodes not yet supported; no follow node for %q", n.DOTID()))
 		}
 		bak := gen.cur
 		t := g.TrueTarget(n)
 		f := g.FalseTarget(n)
 		switch {
-		case t == n.Follow && f == n.Follow:
+		case t == n.IfFollow && f == n.IfFollow:
 			panic("support for multiple edges to follow node not yet supported")
-		case t == n.Follow:
+		case t == n.IfFollow:
 			// if-then
 			//    false branch is body.
 			dbg.Println("if:", n.DOTID())
 			dbg.Println("   then:", node(f).DOTID())
 			body := &ast.BlockStmt{}
 			gen.cur = body
-			gen.genCode(f, n.Follow)
+			gen.genCode(f, n.IfFollow)
 			labelStmt := &ast.LabeledStmt{
 				Label: label,
 				Stmt:  &ast.EmptyStmt{},
@@ -169,14 +169,14 @@ func (gen *generator) genCode(n, ifFollow *cfg.Node) {
 			gen.cur = bak
 			gen.cur.List = append(gen.cur.List, labelStmt)
 			gen.cur.List = append(gen.cur.List, stmt)
-		case f == n.Follow:
+		case f == n.IfFollow:
 			// if-then
 			//    true branch is body.
 			dbg.Println("if:", n.DOTID())
 			dbg.Println("   then:", node(t).DOTID())
 			body := &ast.BlockStmt{}
 			gen.cur = body
-			gen.genCode(t, n.Follow)
+			gen.genCode(t, n.IfFollow)
 			labelStmt := &ast.LabeledStmt{
 				Label: label,
 				Stmt:  &ast.EmptyStmt{},
@@ -195,10 +195,10 @@ func (gen *generator) genCode(n, ifFollow *cfg.Node) {
 			dbg.Println("   else:", node(f).DOTID())
 			trueBody := &ast.BlockStmt{}
 			gen.cur = trueBody
-			gen.genCode(t, n.Follow)
+			gen.genCode(t, n.IfFollow)
 			falseBody := &ast.BlockStmt{}
 			gen.cur = falseBody
-			gen.genCode(f, n.Follow)
+			gen.genCode(f, n.IfFollow)
 			labelStmt := &ast.LabeledStmt{
 				Label: label,
 				Stmt:  &ast.EmptyStmt{},
@@ -213,10 +213,10 @@ func (gen *generator) genCode(n, ifFollow *cfg.Node) {
 			gen.cur.List = append(gen.cur.List, stmt)
 		}
 		// Continue with the follow.
-		dbg.Println("### >> n.Follow", n.Follow)
-		gen.genCode(n.Follow, n.Follow.Follow)
+		dbg.Println("### >> n.Follow", n.IfFollow)
+		gen.genCode(n.IfFollow, n.IfFollow.IfFollow)
 	default:
-		panic(fmt.Errorf("support for node with %d successors not yet implemented", len(g.From(n))))
+		panic(fmt.Errorf("support for node with %d successors not yet implemented", len(g.From(n.ID()))))
 	}
 }
 

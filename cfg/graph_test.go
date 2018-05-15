@@ -188,11 +188,7 @@ func TestSortByRevPost(t *testing.T) {
 		// Check results.
 		var got []string
 		for _, n := range SortByRevPost(in.Nodes()) {
-			nn, ok := n.(*Node)
-			if !ok {
-				panic(fmt.Errorf("invalid node type; expected *cfg.Node, got %T", n))
-			}
-			got = append(got, nn.name)
+			got = append(got, n.name)
 		}
 		if !reflect.DeepEqual(got, gold.want) {
 			t.Errorf("%q; output mismatch; expected `%v`, got `%v`", gold.path, gold.want, got)

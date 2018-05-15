@@ -71,17 +71,17 @@ loop:
 		if n == entry {
 			continue
 		}
-		if I.Has(n) {
+		if I.Has(n.ID()) {
 			// skip if already in I(h).
 			continue
 		}
-		preds := g.To(n)
+		preds := g.To(n.ID())
 		// TODO: how to handle nodes without predecessors?
 		if len(preds) == 0 {
 			panic(fmt.Errorf("invalid node %v; missing predecessors", n))
 		}
 		for _, pred := range preds {
-			if !I.Has(pred) {
+			if !I.Has(pred.ID()) {
 				// skip node, as not all immediate predecessors are in I(h).
 				continue loop
 			}
@@ -101,17 +101,17 @@ func find3(g graph.Directed, entry graph.Node, I *Interval, H *queue) (graph.Nod
 			// skip if already in H.
 			continue
 		}
-		if I.Has(n) {
+		if I.Has(n.ID()) {
 			// skip if already in I(h).
 			continue
 		}
-		preds := g.To(n)
+		preds := g.To(n.ID())
 		// TODO: how to handle nodes without predecessors?
 		if len(preds) == 0 {
 			panic(fmt.Errorf("invalid node %v; missing predecessors", n))
 		}
 		for _, pred := range preds {
-			if I.Has(pred) {
+			if I.Has(pred.ID()) {
 				return n, true
 			}
 		}
@@ -128,8 +128,9 @@ type Interval struct {
 	g graph.Directed
 	// Head specifies the entry node of the interval.
 	Head graph.Node
-	// nodes tracks the nodes contained within the interval.
-	nodes map[graph.Node]bool
+	// nodes tracks the nodes contained within the interval; mapping from node ID
+	// to node.
+	nodes map[int64]graph.Node
 }
 
 // newInterval returns a new interval with the given header node.
@@ -137,59 +138,64 @@ func newInterval(g graph.Directed, head graph.Node) *Interval {
 	return &Interval{
 		g:    g,
 		Head: head,
-		nodes: map[graph.Node]bool{
-			head: true,
+		nodes: map[int64]graph.Node{
+			head.ID(): head,
 		},
 	}
 }
 
 // addNode adds the given node to the interval.
 func (I *Interval) addNode(n graph.Node) {
-	I.nodes[n] = true
+	I.nodes[n.ID()] = n
 }
 
 // Has returns whether the node exists within the interval.
-func (I *Interval) Has(n graph.Node) bool {
-	return I.nodes[n]
+func (I *Interval) Has(id int64) bool {
+	_, ok := I.nodes[id]
+	return ok
 }
 
 // Nodes returns all the nodes in the interval.
 func (I *Interval) Nodes() []graph.Node {
 	var nodes []graph.Node
-	for n := range I.nodes {
+	for _, n := range I.nodes {
 		nodes = append(nodes, n)
 	}
-	return cfg.SortByRevPost(nodes)
+	var retNodes []graph.Node
+	for _, n := range cfg.SortByRevPost(nodes) {
+		retNodes = append(retNodes, n)
+	}
+	return retNodes
 }
 
 // [skip start?] embed graph.Directed in Interval, and only implement Has and
 // [Nodes methods.
 
 // From returns all nodes that can be reached directly from the given node.
-func (I *Interval) From(n graph.Node) []graph.Node {
-	return I.g.From(n)
+func (I *Interval) From(id int64) []graph.Node {
+	return I.g.From(id)
 }
 
 // HasEdgeBetween returns whether an edge exists between nodes x and y without
 // considering direction.
-func (I *Interval) HasEdgeBetween(x, y graph.Node) bool {
-	return I.g.HasEdgeBetween(x, y)
+func (I *Interval) HasEdgeBetween(xid, yid int64) bool {
+	return I.g.HasEdgeBetween(xid, yid)
 }
 
 // Edge returns the edge from u to v if such an edge exists and nil otherwise.
 // The node v must be directly reachable from u as defined by the From method.
-func (I *Interval) Edge(u, v graph.Node) graph.Edge {
-	return I.g.Edge(u, v)
+func (I *Interval) Edge(uid, vid int64) graph.Edge {
+	return I.g.Edge(uid, vid)
 }
 
 // HasEdgeFromTo returns whether an edge exists in the graph from u to v.
-func (I *Interval) HasEdgeFromTo(u, v graph.Node) bool {
-	return I.g.HasEdgeFromTo(u, v)
+func (I *Interval) HasEdgeFromTo(uid, vid int64) bool {
+	return I.g.HasEdgeFromTo(uid, vid)
 }
 
 // To returns all nodes that can reach directly to the given node.
-func (I *Interval) To(n graph.Node) []graph.Node {
-	return I.g.To(n)
+func (I *Interval) To(nid int64) []graph.Node {
+	return I.g.To(nid)
 }
 
 // [skip end?]

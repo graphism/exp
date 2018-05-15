@@ -130,8 +130,8 @@ func structLoops(G *cfg.Graph) {
 func findLatch(I *flow.Interval) (*cfg.Node, bool) {
 	var latch *cfg.Node
 	// Find greatest enclosing back edge (if any).
-	for _, pred := range I.To(I.Head) {
-		if !I.Has(pred) {
+	for _, pred := range I.To(I.Head.ID()) {
+		if !I.Has(pred.ID()) {
 			continue
 		}
 		p, h := node(pred), node(I.Head)
@@ -189,10 +189,10 @@ func loop(I *flow.Interval, latch *cfg.Node) {
 	// Determine loop type.
 	switch {
 	// 2-way latch node.
-	case len(I.From(latch)) == 2:
+	case len(I.From(latch.ID())) == 2:
 		switch {
 		// 1-way header node.
-		case len(I.From(head)) == 1:
+		case len(I.From(head.ID())) == 1:
 			head.LoopType = cfg.LoopTypePostTest
 		// 2-way header node.
 		default:
@@ -203,7 +203,7 @@ func loop(I *flow.Interval, latch *cfg.Node) {
 	default:
 		switch {
 		// 2-way header node.
-		case len(I.From(head)) == 2:
+		case len(I.From(head.ID())) == 2:
 			head.LoopType = cfg.LoopTypePreTest
 		// 1-way header node.
 		default:
@@ -217,19 +217,19 @@ func loop(I *flow.Interval, latch *cfg.Node) {
 	switch head.LoopType {
 	case cfg.LoopTypePreTest:
 		// Follow node is the successor of the header node not part of loop nodes.
-		succs := I.From(head)
+		succs := I.From(head.ID())
 		if nodes[succs[0]] {
-			head.Follow = node(succs[1])
+			head.LoopFollow = node(succs[1])
 		} else {
-			head.Follow = node(succs[0])
+			head.LoopFollow = node(succs[0])
 		}
 	case cfg.LoopTypePostTest:
 		// Follow node is the successor of the latch node not part of loop nodes.
-		succs := I.From(latch)
+		succs := I.From(latch.ID())
 		if nodes[succs[0]] {
-			head.Follow = node(succs[1])
+			head.LoopFollow = node(succs[1])
 		} else {
-			head.Follow = node(succs[0])
+			head.LoopFollow = node(succs[0])
 		}
 	case cfg.LoopTypeEndless:
 		// Determine follow node (if any) by traversing all nodes in the loop.
@@ -256,7 +256,7 @@ func struct2Way(G *cfg.Graph) {
 	for _, m := range cfg.SortByPost(G.Nodes()) {
 		mm := node(m)
 		//dbg.Println("mm:", mm.RevPost, mm.DOTID())
-		if len(G.From(m)) != 2 {
+		if len(G.From(m.ID())) != 2 {
 			continue
 		}
 		if mm.LoopHead == m {
@@ -267,12 +267,12 @@ func struct2Way(G *cfg.Graph) {
 		}
 		if n, ok := find2WayFollow(G, m, domtree); ok {
 			// follow(m) = n
-			mm.Follow = n
+			mm.IfFollow = n
 			// for (all x in unresolved)
 			for x := range unresolved {
 				// follow(x) = n
 				xx := node(x)
-				xx.Follow = n
+				xx.IfFollow = n
 				// unresolved = unresolved - {x}
 				delete(unresolved, x)
 			}
@@ -293,7 +293,7 @@ func find2WayFollow(G *cfg.Graph, m graph.Node, domtree path.DominatorTree) (*cf
 	//mm := node(m)
 	var n *cfg.Node
 	for _, i := range cfg.SortByRevPost(G.Nodes()) {
-		if domtree.DominatorOf(i) == m && len(G.To(i)) >= 2 {
+		if domtree.DominatorOf(i) == m && len(G.To(i.ID())) >= 2 {
 			ii := node(i)
 			//dbg.Printf("immdom of %v is %v\n", ii.DOTID(), mm.DOTID())
 			if n == nil || ii.RevPost > n.RevPost {
@@ -313,7 +313,7 @@ func CompoundCond(g *cfg.Graph) *cfg.Graph {
 		// Traverse nodes in postorder, this way, the header node of a compound
 		// condition is analyzed first.
 		for _, n := range cfg.SortByRevPost(g.Nodes()) {
-			if len(g.From(n)) != 2 {
+			if len(g.From(n.ID())) != 2 {
 				continue
 			}
 			nn := node(n)
@@ -372,7 +372,7 @@ func compoundCondAND(g *cfg.Graph, x *cfg.Node) bool {
 	//
 	y := g.TrueTarget(x)  // true branch
 	e := g.FalseTarget(x) // false branch
-	if len(g.To(y)) == 1 && len(g.From(y)) == 2 {
+	if len(g.To(y.ID())) == 1 && len(g.From(y.ID())) == 2 {
 		t := g.TrueTarget(y)   // true branch
 		e2 := g.FalseTarget(y) // false branch
 		if e == e2 {
@@ -399,7 +399,7 @@ func compoundCondOR(g *cfg.Graph, x *cfg.Node) bool {
 	//
 	t := g.TrueTarget(x)  // true branch
 	y := g.FalseTarget(x) // false branch
-	if len(g.To(y)) == 1 && len(g.From(y)) == 2 {
+	if len(g.To(y.ID())) == 1 && len(g.From(y.ID())) == 2 {
 		t2 := g.TrueTarget(y) // true branch
 		e := g.FalseTarget(y) // false branch
 		if t == t2 {
@@ -426,7 +426,7 @@ func compoundCondNAND(g *cfg.Graph, x *cfg.Node) bool {
 	//
 	e := g.TrueTarget(x)  // true branch
 	y := g.FalseTarget(x) // false branch
-	if len(g.To(y)) == 1 && len(g.From(y)) == 2 {
+	if len(g.To(y.ID())) == 1 && len(g.From(y.ID())) == 2 {
 		t := g.TrueTarget(y)   // true branch
 		e2 := g.FalseTarget(y) // false branch
 		if e == e2 {
@@ -453,7 +453,7 @@ func compoundCondNOR(g *cfg.Graph, x *cfg.Node) bool {
 	//
 	y := g.TrueTarget(x)  // true branch
 	t := g.FalseTarget(x) // false branch
-	if len(g.To(y)) == 1 && len(g.From(y)) == 2 {
+	if len(g.To(y.ID())) == 1 && len(g.From(y.ID())) == 2 {
 		t2 := g.TrueTarget(y) // true branch
 		e := g.FalseTarget(y) // false branch
 		if t == t2 {
@@ -491,8 +491,8 @@ func mergeCond(g *cfg.Graph, x, y, e, t *cfg.Node, name string) *cfg.Graph {
 	if !ok {
 		panic(fmt.Errorf("unable to locate compound condition node %q", newName))
 	}
-	trueEdge := edge(g.Edge(n, t))
-	falseEdge := edge(g.Edge(n, e))
+	trueEdge := edge(g.Edge(n.ID(), t.ID()))
+	falseEdge := edge(g.Edge(n.ID(), e.ID()))
 	trueEdge.Attrs["label"] = "true"
 	falseEdge.Attrs["label"] = "false"
 	return g

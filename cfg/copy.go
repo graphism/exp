@@ -10,8 +10,8 @@ func Copy(dst, src *Graph) {
 		dst.AddNode(n)
 	}
 	for _, u := range nodes {
-		for _, v := range src.From(u) {
-			dst.SetEdge(src.Edge(u, v))
+		for _, v := range src.From(u.ID()) {
+			dst.SetEdge(src.Edge(u.ID(), v.ID()))
 		}
 	}
 	dst.initNodes()
