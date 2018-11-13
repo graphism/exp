@@ -53,9 +53,11 @@ func NewGraph() *Graph {
 func NewGraphFromFunc(f *ir.Function) *Graph {
 	g := NewGraph()
 	// Force generate local IDs.
-	_ = f.String()
+	if err := f.AssignIDs(); err != nil {
+		panic(fmt.Errorf("unable to assign IDs to locate variables of function %q; %v", f.Ident(), err))
+	}
 	for i, block := range f.Blocks {
-		from := nodeWithName(g, block.Name)
+		from := nodeWithName(g, block.LocalName)
 		if i == 0 {
 			// Store entry node.
 			g.SetEntry(from)
@@ -64,20 +66,20 @@ func NewGraphFromFunc(f *ir.Function) *Graph {
 		case *ir.TermRet:
 			// nothing to do.
 		case *ir.TermBr:
-			to := nodeWithName(g, term.Target.Name)
+			to := nodeWithName(g, term.Target.LocalName)
 			edgeWithLabel(g, from, to, "")
 		case *ir.TermCondBr:
-			t := nodeWithName(g, term.TargetTrue.Name)
-			f := nodeWithName(g, term.TargetFalse.Name)
+			t := nodeWithName(g, term.TargetTrue.LocalName)
+			f := nodeWithName(g, term.TargetFalse.LocalName)
 			edgeWithLabel(g, from, t, "true")
 			edgeWithLabel(g, from, f, "false")
 		case *ir.TermSwitch:
 			for _, c := range term.Cases {
-				to := nodeWithName(g, c.Target.Name)
+				to := nodeWithName(g, c.Target.LocalName)
 				label := fmt.Sprintf("case (x=%v)", c.X.Ident())
 				edgeWithLabel(g, from, to, label)
 			}
-			to := nodeWithName(g, term.TargetDefault.Name)
+			to := nodeWithName(g, term.TargetDefault.LocalName)
 			edgeWithLabel(g, from, to, "default case")
 		case *ir.TermUnreachable:
 			// nothing to do.
