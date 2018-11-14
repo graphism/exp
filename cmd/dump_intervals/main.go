@@ -42,7 +42,9 @@ func dumpIntervals(path string) error {
 	is := flow.Intervals(g, g.Entry())
 	for _, i := range is {
 		dbg.Println("head:", i.Head)
-		for _, n := range i.Nodes() {
+		nodes := i.Nodes()
+		for nodes.Next() {
+			n := nodes.Node()
 			dbg.Println("   n:", n)
 		}
 	}
@@ -118,7 +120,7 @@ func (gen *generator) genCode(n, ifFollow *cfg.Node) {
 	// TODO: Add support for loops.
 
 	g := gen.g
-	succs := g.From(n.ID())
+	succs := graph.NodesOf(g.From(n.ID()))
 	switch len(succs) {
 	// Return statement.
 	case 0:
@@ -216,7 +218,7 @@ func (gen *generator) genCode(n, ifFollow *cfg.Node) {
 		dbg.Println("### >> n.Follow", n.IfFollow)
 		gen.genCode(n.IfFollow, n.IfFollow.IfFollow)
 	default:
-		panic(fmt.Errorf("support for node with %d successors not yet implemented", len(g.From(n.ID()))))
+		panic(fmt.Errorf("support for node with %d successors not yet implemented", g.From(n.ID()).Len()))
 	}
 }
 

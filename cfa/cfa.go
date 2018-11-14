@@ -51,13 +51,15 @@ func DerivedGraphSeq(src *cfg.Graph) []*cfg.Graph {
 	createGraph(G)
 	Gs = append(Gs, G)
 	intNum := 1
-	for i := 2; len(G.Nodes()) > 1; i++ {
+	for i := 2; G.Nodes().Len() > 1; i++ {
 		Is := flow.Intervals(G, G.Entry())
 		for _, I := range Is {
 			// Collapse interval into a single node.
 			newName := fmt.Sprintf("I%d", intNum)
 			delNodes := make(map[string]bool)
-			for _, n := range I.Nodes() {
+			Inodes := I.Nodes()
+			for Inodes.Next() {
+				n := Inodes.Node()
 				nn := node(n)
 				nn.Attrs["fillcolor"] = "red"
 				nn.Attrs["style"] = "filled"
@@ -68,7 +70,8 @@ func DerivedGraphSeq(src *cfg.Graph) []*cfg.Graph {
 			nameBak := G.DOTID()
 			G.SetDOTID(nameBak + "_a")
 			createGraph(G)
-			for _, n := range I.Nodes() {
+			for Inodes.Reset(); Inodes.Next(); {
+				n := Inodes.Node()
 				nn := node(n)
 				delete(nn.Attrs, "fillcolor")
 				delete(nn.Attrs, "style")
@@ -130,8 +133,10 @@ func structLoops(G *cfg.Graph) {
 func findLatch(I *flow.Interval) (*cfg.Node, bool) {
 	var latch *cfg.Node
 	// Find greatest enclosing back edge (if any).
-	for _, pred := range I.To(I.Head.ID()) {
-		if !I.Has(pred.ID()) {
+	predNodes := I.To(I.Head.ID())
+	for predNodes.Next() {
+		pred := predNodes.Node()
+		if I.Node(pred.ID()) == nil {
 			continue
 		}
 		p, h := node(pred), node(I.Head)
@@ -166,7 +171,7 @@ func loop(I *flow.Interval, latch *cfg.Node) {
 	// than I.
 	domtree := path.Dominators(head, I)
 	// Mark nodes in loop headed by head.
-	for _, n := range cfg.SortByRevPost(I.Nodes()) {
+	for _, n := range cfg.SortByRevPost(graph.NodesOf(I.Nodes())) {
 		nn := node(n)
 		if nn.RevPost <= head.RevPost {
 			continue
@@ -189,10 +194,10 @@ func loop(I *flow.Interval, latch *cfg.Node) {
 	// Determine loop type.
 	switch {
 	// 2-way latch node.
-	case len(I.From(latch.ID())) == 2:
+	case I.From(latch.ID()).Len() == 2:
 		switch {
 		// 1-way header node.
-		case len(I.From(head.ID())) == 1:
+		case I.From(head.ID()).Len() == 1:
 			head.LoopType = cfg.LoopTypePostTest
 		// 2-way header node.
 		default:
@@ -203,7 +208,7 @@ func loop(I *flow.Interval, latch *cfg.Node) {
 	default:
 		switch {
 		// 2-way header node.
-		case len(I.From(head.ID())) == 2:
+		case I.From(head.ID()).Len() == 2:
 			head.LoopType = cfg.LoopTypePreTest
 		// 1-way header node.
 		default:
@@ -217,7 +222,7 @@ func loop(I *flow.Interval, latch *cfg.Node) {
 	switch head.LoopType {
 	case cfg.LoopTypePreTest:
 		// Follow node is the successor of the header node not part of loop nodes.
-		succs := I.From(head.ID())
+		succs := graph.NodesOf(I.From(head.ID()))
 		if nodes[succs[0]] {
 			head.LoopFollow = node(succs[1])
 		} else {
@@ -225,7 +230,7 @@ func loop(I *flow.Interval, latch *cfg.Node) {
 		}
 	case cfg.LoopTypePostTest:
 		// Follow node is the successor of the latch node not part of loop nodes.
-		succs := I.From(latch.ID())
+		succs := graph.NodesOf(I.From(latch.ID()))
 		if nodes[succs[0]] {
 			head.LoopFollow = node(succs[1])
 		} else {
@@ -253,10 +258,10 @@ func struct2Way(G *cfg.Graph) {
 	// innermost nested conditional first, and then the outer ones.
 
 	// for (all nodes m in N in descending order)
-	for _, m := range cfg.SortByPost(G.Nodes()) {
+	for _, m := range cfg.SortByPost(graph.NodesOf(G.Nodes())) {
 		mm := node(m)
 		//dbg.Println("mm:", mm.RevPost, mm.DOTID())
-		if len(G.From(m.ID())) != 2 {
+		if G.From(m.ID()).Len() != 2 {
 			continue
 		}
 		if mm.LoopHead == m {
@@ -292,8 +297,8 @@ func find2WayFollow(G *cfg.Graph, m graph.Node, domtree path.DominatorTree) (*cf
 	// n = max{i | immedDom(i) == m and #inEdges(i) >= 2}
 	//mm := node(m)
 	var n *cfg.Node
-	for _, i := range cfg.SortByRevPost(G.Nodes()) {
-		if domtree.DominatorOf(i) == m && len(G.To(i.ID())) >= 2 {
+	for _, i := range cfg.SortByRevPost(graph.NodesOf(G.Nodes())) {
+		if domtree.DominatorOf(i) == m && G.To(i.ID()).Len() >= 2 {
 			ii := node(i)
 			//dbg.Printf("immdom of %v is %v\n", ii.DOTID(), mm.DOTID())
 			if n == nil || ii.RevPost > n.RevPost {
@@ -312,8 +317,8 @@ func CompoundCond(g *cfg.Graph) *cfg.Graph {
 		change = false
 		// Traverse nodes in postorder, this way, the header node of a compound
 		// condition is analyzed first.
-		for _, n := range cfg.SortByRevPost(g.Nodes()) {
-			if len(g.From(n.ID())) != 2 {
+		for _, n := range cfg.SortByRevPost(graph.NodesOf(g.Nodes())) {
+			if g.From(n.ID()).Len() != 2 {
 				continue
 			}
 			nn := node(n)
@@ -372,7 +377,7 @@ func compoundCondAND(g *cfg.Graph, x *cfg.Node) bool {
 	//
 	y := g.TrueTarget(x)  // true branch
 	e := g.FalseTarget(x) // false branch
-	if len(g.To(y.ID())) == 1 && len(g.From(y.ID())) == 2 {
+	if g.To(y.ID()).Len() == 1 && g.From(y.ID()).Len() == 2 {
 		t := g.TrueTarget(y)   // true branch
 		e2 := g.FalseTarget(y) // false branch
 		if e == e2 {
@@ -399,7 +404,7 @@ func compoundCondOR(g *cfg.Graph, x *cfg.Node) bool {
 	//
 	t := g.TrueTarget(x)  // true branch
 	y := g.FalseTarget(x) // false branch
-	if len(g.To(y.ID())) == 1 && len(g.From(y.ID())) == 2 {
+	if g.To(y.ID()).Len() == 1 && g.From(y.ID()).Len() == 2 {
 		t2 := g.TrueTarget(y) // true branch
 		e := g.FalseTarget(y) // false branch
 		if t == t2 {
@@ -426,7 +431,7 @@ func compoundCondNAND(g *cfg.Graph, x *cfg.Node) bool {
 	//
 	e := g.TrueTarget(x)  // true branch
 	y := g.FalseTarget(x) // false branch
-	if len(g.To(y.ID())) == 1 && len(g.From(y.ID())) == 2 {
+	if g.To(y.ID()).Len() == 1 && g.From(y.ID()).Len() == 2 {
 		t := g.TrueTarget(y)   // true branch
 		e2 := g.FalseTarget(y) // false branch
 		if e == e2 {
@@ -453,7 +458,7 @@ func compoundCondNOR(g *cfg.Graph, x *cfg.Node) bool {
 	//
 	y := g.TrueTarget(x)  // true branch
 	t := g.FalseTarget(x) // false branch
-	if len(g.To(y.ID())) == 1 && len(g.From(y.ID())) == 2 {
+	if g.To(y.ID()).Len() == 1 && g.From(y.ID()).Len() == 2 {
 		t2 := g.TrueTarget(y) // true branch
 		e := g.FalseTarget(y) // false branch
 		if t == t2 {
@@ -516,7 +521,7 @@ func createGraph(g *cfg.Graph) {
 	if len(name) == 0 {
 		panic(fmt.Errorf("missing name in graph %v", g))
 	}
-	buf, err := dot.Marshal(g, name, "", "\t", false)
+	buf, err := dot.Marshal(g, name, "", "\t")
 	if err != nil {
 		log.Fatalf("%+v", errors.WithStack(err))
 	}

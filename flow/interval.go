@@ -14,6 +14,7 @@ import (
 	"github.com/mewkiz/pkg/term"
 
 	"gonum.org/v1/gonum/graph"
+	"gonum.org/v1/gonum/graph/iterator"
 )
 
 // dbg logs debug messages to standard error, with the prefix "interval:".
@@ -65,23 +66,24 @@ func find2_2(g graph.Directed, entry graph.Node, I *Interval) (graph.Node, bool)
 	// 2.2. Add to I(h) any node all of whose immediate predecessors are
 	// already in I(h).
 loop:
-	for _, n := range cfg.SortByRevPost(g.Nodes()) {
+	for _, n := range cfg.SortByRevPost(graph.NodesOf(g.Nodes())) {
 		//dbg.Println("n:", n)
 		//dbg.Println("entry:", entry)
 		if n == entry {
 			continue
 		}
-		if I.Has(n.ID()) {
+		if I.Node(n.ID()) != nil {
 			// skip if already in I(h).
 			continue
 		}
 		preds := g.To(n.ID())
 		// TODO: how to handle nodes without predecessors?
-		if len(preds) == 0 {
+		if preds.Len() == 0 {
 			panic(fmt.Errorf("invalid node %v; missing predecessors", n))
 		}
-		for _, pred := range preds {
-			if !I.Has(pred.ID()) {
+		for preds.Next() {
+			pred := preds.Node()
+			if I.Node(pred.ID()) == nil {
 				// skip node, as not all immediate predecessors are in I(h).
 				continue loop
 			}
@@ -96,22 +98,23 @@ func find3(g graph.Directed, entry graph.Node, I *Interval, H *queue) (graph.Nod
 	// I(h) but which have immediate predecessors in I(h). Therefore a node is
 	// added to H the first time any (but not all) of its immediate predecessors
 	// become members of an interval.
-	for _, n := range cfg.SortByRevPost(g.Nodes()) {
+	for _, n := range cfg.SortByRevPost(graph.NodesOf(g.Nodes())) {
 		if H.has(n) {
 			// skip if already in H.
 			continue
 		}
-		if I.Has(n.ID()) {
+		if I.Node(n.ID()) != nil {
 			// skip if already in I(h).
 			continue
 		}
 		preds := g.To(n.ID())
 		// TODO: how to handle nodes without predecessors?
-		if len(preds) == 0 {
+		if preds.Len() == 0 {
 			panic(fmt.Errorf("invalid node %v; missing predecessors", n))
 		}
-		for _, pred := range preds {
-			if I.Has(pred.ID()) {
+		for preds.Next() {
+			pred := preds.Node()
+			if I.Node(pred.ID()) != nil {
 				return n, true
 			}
 		}
@@ -149,14 +152,15 @@ func (I *Interval) addNode(n graph.Node) {
 	I.nodes[n.ID()] = n
 }
 
-// Has returns whether the node exists within the interval.
-func (I *Interval) Has(id int64) bool {
-	_, ok := I.nodes[id]
-	return ok
+// Node returns the node with the given ID if it exists in the graph, and nil
+// otherwise.
+func (I *Interval) Node(id int64) graph.Node {
+	n, _ := I.nodes[id]
+	return n
 }
 
 // Nodes returns all the nodes in the interval.
-func (I *Interval) Nodes() []graph.Node {
+func (I *Interval) Nodes() graph.Nodes {
 	var nodes []graph.Node
 	for _, n := range I.nodes {
 		nodes = append(nodes, n)
@@ -165,14 +169,14 @@ func (I *Interval) Nodes() []graph.Node {
 	for _, n := range cfg.SortByRevPost(nodes) {
 		retNodes = append(retNodes, n)
 	}
-	return retNodes
+	return iterator.NewOrderedNodes(retNodes)
 }
 
 // [skip start?] embed graph.Directed in Interval, and only implement Has and
 // [Nodes methods.
 
 // From returns all nodes that can be reached directly from the given node.
-func (I *Interval) From(id int64) []graph.Node {
+func (I *Interval) From(id int64) graph.Nodes {
 	return I.g.From(id)
 }
 
@@ -194,7 +198,7 @@ func (I *Interval) HasEdgeFromTo(uid, vid int64) bool {
 }
 
 // To returns all nodes that can reach directly to the given node.
-func (I *Interval) To(nid int64) []graph.Node {
+func (I *Interval) To(nid int64) graph.Nodes {
 	return I.g.To(nid)
 }
 

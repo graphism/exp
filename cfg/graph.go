@@ -120,7 +120,7 @@ func edgeWithLabel(g *Graph, from, to *Node, label string) *Edge {
 
 // String returns the string representation of the graph in Graphviz DOT format.
 func (g *Graph) String() string {
-	data, err := dot.Marshal(g, g.DOTID(), "", "\t", false)
+	data, err := dot.Marshal(g, g.DOTID(), "", "\t")
 	if err != nil {
 		panic(fmt.Errorf("unable to marshal control flow graph in DOT format; %v", err))
 	}
@@ -162,7 +162,7 @@ func (g *Graph) NodeWithName(name string) (*Node, bool) {
 
 // TrueTarget returns the target node of the true branch from n.
 func (g *Graph) TrueTarget(n *Node) *Node {
-	succs := g.From(n.ID())
+	succs := graph.NodesOf(g.From(n.ID()))
 	if len(succs) != 2 {
 		panic(fmt.Errorf("invalid number of successors; expected 2, got %d", len(succs)))
 	}
@@ -188,7 +188,7 @@ func (g *Graph) TrueTarget(n *Node) *Node {
 
 // FalseTarget returns the target node of the false branch from n.
 func (g *Graph) FalseTarget(n *Node) *Node {
-	succs := g.From(n.ID())
+	succs := graph.NodesOf(g.From(n.ID()))
 	if len(succs) != 2 {
 		panic(fmt.Errorf("invalid number of successors; expected 2, got %d", len(succs)))
 	}
@@ -214,7 +214,9 @@ func (g *Graph) FalseTarget(n *Node) *Node {
 
 // initNodes initializes the mapping between node names and graph nodes.
 func (g *Graph) initNodes() {
-	for _, n := range g.Nodes() {
+	nodes := g.Nodes()
+	for nodes.Next() {
+		n := nodes.Node()
 		nn := node(n)
 		if len(nn.name) == 0 {
 			panic(fmt.Errorf("invalid node; missing node name in %#v", nn))
@@ -304,10 +306,10 @@ func (g *Graph) SetEdge(e graph.Edge) {
 	}
 	// Add nodes if not yet present in graph.
 	from, to := ee.From(), ee.To()
-	if !g.Has(from.ID()) {
+	if g.Node(from.ID()) == nil {
 		g.AddNode(from)
 	}
-	if !g.Has(to.ID()) {
+	if g.Node(to.ID()) == nil {
 		g.AddNode(to)
 	}
 	// Add edge.
