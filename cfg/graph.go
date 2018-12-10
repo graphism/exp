@@ -57,7 +57,7 @@ func NewGraphFromFunc(f *ir.Function) *Graph {
 		panic(fmt.Errorf("unable to assign IDs to locate variables of function %q; %v", f.Ident(), err))
 	}
 	for i, block := range f.Blocks {
-		from := nodeWithName(g, block.LocalName)
+		from := nodeWithName(g, localIdent(block.LocalIdent))
 		if i == 0 {
 			// Store entry node.
 			g.SetEntry(from)
@@ -66,20 +66,20 @@ func NewGraphFromFunc(f *ir.Function) *Graph {
 		case *ir.TermRet:
 			// nothing to do.
 		case *ir.TermBr:
-			to := nodeWithName(g, term.Target.LocalName)
+			to := nodeWithName(g, localIdent(term.Target.LocalIdent))
 			edgeWithLabel(g, from, to, "")
 		case *ir.TermCondBr:
-			t := nodeWithName(g, term.TargetTrue.LocalName)
-			f := nodeWithName(g, term.TargetFalse.LocalName)
+			t := nodeWithName(g, localIdent(term.TargetTrue.LocalIdent))
+			f := nodeWithName(g, localIdent(term.TargetFalse.LocalIdent))
 			edgeWithLabel(g, from, t, "true")
 			edgeWithLabel(g, from, f, "false")
 		case *ir.TermSwitch:
 			for _, c := range term.Cases {
-				to := nodeWithName(g, c.Target.LocalName)
+				to := nodeWithName(g, localIdent(c.Target.LocalIdent))
 				label := fmt.Sprintf("case (x=%v)", c.X.Ident())
 				edgeWithLabel(g, from, to, label)
 			}
-			to := nodeWithName(g, term.TargetDefault.LocalName)
+			to := nodeWithName(g, localIdent(term.TargetDefault.LocalIdent))
 			edgeWithLabel(g, from, to, "default case")
 		case *ir.TermUnreachable:
 			// nothing to do.
@@ -517,4 +517,12 @@ func (g *Graph) nodeWithName(name string) *Node {
 		panic(fmt.Errorf("unable to locate node with name %q", name))
 	}
 	return n
+}
+
+// localIdent returns the identifier (without '%' prefix) of the local
+// identifier.
+func localIdent(ident ir.LocalIdent) string {
+	const prefix = "%"
+	s := ident.Ident()
+	return s[len(prefix):]
 }
