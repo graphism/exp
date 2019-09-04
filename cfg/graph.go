@@ -50,7 +50,7 @@ func NewGraph() *Graph {
 
 // NewGraphFromFunc returns a new control flow graph based on the given
 // function.
-func NewGraphFromFunc(f *ir.Function) *Graph {
+func NewGraphFromFunc(f *ir.Func) *Graph {
 	g := NewGraph()
 	// Force generate local IDs.
 	if err := f.AssignIDs(); err != nil {
