@@ -11,6 +11,7 @@ import (
 
 	"github.com/graphism/simple"
 	"github.com/llir/llvm/ir"
+	"github.com/llir/llvm/ir/value"
 	"github.com/mewkiz/pkg/term"
 	"github.com/pkg/errors"
 	"gonum.org/v1/gonum/graph"
@@ -57,7 +58,7 @@ func NewGraphFromFunc(f *ir.Func) *Graph {
 		panic(fmt.Errorf("unable to assign IDs to locate variables of function %q; %v", f.Ident(), err))
 	}
 	for i, block := range f.Blocks {
-		from := nodeWithName(g, localIdent(block.LocalIdent))
+		from := nodeWithName(g, block.Name())
 		if i == 0 {
 			// Store entry node.
 			g.SetEntry(from)
@@ -66,20 +67,20 @@ func NewGraphFromFunc(f *ir.Func) *Graph {
 		case *ir.TermRet:
 			// nothing to do.
 		case *ir.TermBr:
-			to := nodeWithName(g, localIdent(term.Target.LocalIdent))
+			to := nodeWithName(g, term.Target.(value.Named).Name())
 			edgeWithLabel(g, from, to, "")
 		case *ir.TermCondBr:
-			t := nodeWithName(g, localIdent(term.TargetTrue.LocalIdent))
-			f := nodeWithName(g, localIdent(term.TargetFalse.LocalIdent))
+			t := nodeWithName(g, term.TargetTrue.(value.Named).Name())
+			f := nodeWithName(g, term.TargetFalse.(value.Named).Name())
 			edgeWithLabel(g, from, t, "true")
 			edgeWithLabel(g, from, f, "false")
 		case *ir.TermSwitch:
 			for _, c := range term.Cases {
-				to := nodeWithName(g, localIdent(c.Target.LocalIdent))
+				to := nodeWithName(g, c.Target.(value.Named).Name())
 				label := fmt.Sprintf("case (x=%v)", c.X.Ident())
 				edgeWithLabel(g, from, to, label)
 			}
-			to := nodeWithName(g, localIdent(term.TargetDefault.LocalIdent))
+			to := nodeWithName(g, term.TargetDefault.(value.Named).Name())
 			edgeWithLabel(g, from, to, "default case")
 		case *ir.TermUnreachable:
 			// nothing to do.
@@ -517,12 +518,4 @@ func (g *Graph) nodeWithName(name string) *Node {
 		panic(fmt.Errorf("unable to locate node with name %q", name))
 	}
 	return n
-}
-
-// localIdent returns the identifier (without '%' prefix) of the local
-// identifier.
-func localIdent(ident ir.LocalIdent) string {
-	const prefix = "%"
-	s := ident.Ident()
-	return s[len(prefix):]
 }

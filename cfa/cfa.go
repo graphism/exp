@@ -20,7 +20,7 @@ import (
 	"github.com/pkg/errors"
 	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/encoding/dot"
-	"gonum.org/v1/gonum/graph/path"
+	gonumflow "gonum.org/v1/gonum/graph/flow"
 )
 
 // dbg logs debug messages to standard error, with the prefix "interval:".
@@ -169,7 +169,7 @@ func loop(I *flow.Interval, latch *cfg.Node) {
 	nodes[head] = true
 	// TODO: Consider moving idom computation Structure, and perform on G rather
 	// than I.
-	domtree := path.Dominators(head, I)
+	domtree := gonumflow.Dominators(head, I)
 	// Mark nodes in loop headed by head.
 	for _, n := range cfg.SortByRevPost(graph.NodesOf(I.Nodes())) {
 		nn := node(n)
@@ -179,7 +179,7 @@ func loop(I *flow.Interval, latch *cfg.Node) {
 		if nn.RevPost >= latch.RevPost {
 			break
 		}
-		if idom := domtree.DominatorOf(n); !nodes[idom] {
+		if idom := domtree.DominatorOf(n.ID()); !nodes[idom] {
 			continue
 		}
 		nodes[nn] = true
@@ -249,7 +249,7 @@ func loop(I *flow.Interval, latch *cfg.Node) {
 // Post: 2-way conditionals are marked in G. the follow node for all 2-way
 // conditionals is determined.
 func struct2Way(G *cfg.Graph) {
-	domtree := path.Dominators(G.Entry(), G)
+	domtree := gonumflow.Dominators(G.Entry(), G)
 	// unresolved = {}
 	unresolved := make(map[graph.Node]bool)
 
@@ -293,12 +293,12 @@ func struct2Way(G *cfg.Graph) {
 }
 
 // find2WayFollow locates the follow node of the 2-way conditional.
-func find2WayFollow(G *cfg.Graph, m graph.Node, domtree path.DominatorTree) (*cfg.Node, bool) {
+func find2WayFollow(G *cfg.Graph, m graph.Node, domtree gonumflow.DominatorTree) (*cfg.Node, bool) {
 	// n = max{i | immedDom(i) == m and #inEdges(i) >= 2}
 	//mm := node(m)
 	var n *cfg.Node
 	for _, i := range cfg.SortByRevPost(graph.NodesOf(G.Nodes())) {
-		if domtree.DominatorOf(i) == m && G.To(i.ID()).Len() >= 2 {
+		if domtree.DominatorOf(i.ID()) == m && G.To(i.ID()).Len() >= 2 {
 			ii := node(i)
 			//dbg.Printf("immdom of %v is %v\n", ii.DOTID(), mm.DOTID())
 			if n == nil || ii.RevPost > n.RevPost {
